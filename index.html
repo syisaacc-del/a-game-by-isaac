@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+
+<html lang="zh-TW">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
+  <meta name="apple-mobile-web-app-capable" content="yes">
+
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <meta name="theme-color" content="#0a0a0a">
+
+  <title>Zombie Survival</title>
+
+  <link rel="stylesheet" href="style.css">
+
+  <link rel="stylesheet" href="mobile.css">
+
+</head>
+
+<body>
+
+  <div id="info">
+
+    <h1>Zombie Survival</h1>
+
+    <p>移動：[A][S][W][D] 或 [←][↑][↓][→]（八方向）</p>
+
+    <p>射擊：[SPACE] 或 [K]</p>
+
+    <p>地圖有血包（+）同裝備，行過去自動拾取</p>
+
+    <p>選角開局｜3 位國際角色天賦｜本地雙人 P1:WASD P2:方向鍵</p>
+
+  </div>
+
+  <div id="hud">
+
+    <span id="score">SCORE: 0</span>
+
+    <span id="lives">LIVES: 3</span>
+
+    <span id="level">LEVEL: 1</span>
+
+    <span id="equip" class="hidden"></span>
+
+  </div>
+
+  <div id="title-banner" class="hidden">
+
+    <div class="title-rays"></div>
+
+    <span class="title-prefix">★ 稱 號 ★</span>
+
+    <span id="title-text" class="title-name"></span>
+
+  </div>
+
+  <div id="overlay" class="hidden">
+
+    <div id="overlay-text"></div>
+
+    <p class="hint hint-desktop">按 SPACE 重新開始</p>
+
+    <p class="hint hint-mobile">點擊開始</p>
+
+  </div>
+
+  <div id="char-modal" class="hidden">
+    <div class="char-panel">
+      <h2>選擇角色</h2>
+      <div class="char-cards">
+        <button type="button" class="char-card" data-char="hayato">
+          <span class="char-flag">🇯🇵</span>
+          <strong>隼人</strong>
+          <span class="char-nation">日本</span>
+          <span class="char-talent">【極速】移動 +55%</span>
+        </button>
+        <button type="button" class="char-card" data-char="viktor">
+          <span class="char-flag">🇷🇺</span>
+          <strong>Viktor</strong>
+          <span class="char-nation">俄羅斯</span>
+          <span class="char-talent">【鐵壁】HP+60 減傷20%</span>
+        </button>
+        <button type="button" class="char-card" data-char="zara">
+          <span class="char-flag">🇪🇬</span>
+          <strong>Zara</strong>
+          <span class="char-nation">埃及</span>
+          <span class="char-talent">【雷電】連鎖 +1</span>
+        </button>
+      </div>
+      <div class="mode-btns">
+        <button type="button" id="btn-solo" class="mob-btn mob-btn-y">單人 [Enter]</button>
+        <button type="button" id="btn-local" class="mob-btn mob-btn-n">本地雙人 [L]</button>
+      </div>
+      <div class="online-row">
+        <button type="button" id="btn-online-host" class="mob-btn">開房</button>
+        <input id="room-input" type="text" placeholder="房間碼" maxlength="12">
+        <button type="button" id="btn-online-join" class="mob-btn">加入</button>
+      </div>
+    </div>
+  </div>
+  <div id="mp-modal" class="hidden">
+    <div class="modal-box">
+      <p>房間碼（俾隊友輸入）：</p>
+      <p id="room-code" class="room-code"></p>
+    </div>
+  </div>
+  <div id="level-modal" class="hidden">
+
+    <div class="modal-box">
+
+      <h2>LEVEL CLEAR!</h2>
+
+      <p>要打 Boss 嗎？</p>
+
+      <p class="modal-keys"><span class="key-y">Y</span> 打 Boss　<span class="key-n">N</span> 跳過</p>
+
+      <div class="modal-btns">
+
+        <button type="button" id="btn-boss-y" class="mob-btn mob-btn-y">打 Boss</button>
+
+        <button type="button" id="btn-boss-n" class="mob-btn mob-btn-n">跳過</button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <canvas id="canvas"></canvas>
+
+  <div id="controls">
+
+    <div id="joystick" class="joystick-zone"></div>
+
+    <div id="joystick-base" class="joystick-base hidden">
+
+      <div id="joystick-stick" class="joystick-stick"></div>
+
+    </div>
+
+    <button type="button" id="btn-shoot" class="action-btn shoot-btn" aria-label="射擊">🔫</button>
+
+    <button type="button" id="btn-dragonfly" class="action-btn dragonfly-btn hidden" aria-label="必殺">必殺</button>
+
+  </div>
+
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script type="module" src="bootstrap.js"></script>
+
+</body>
+
+</html>
+
