@@ -37,30 +37,31 @@ export class Asteroid {
     this.active = true;
     this.type = 'boss';
     this.isBoss = true;
-    this.radius = 80;
+    this.radius = 88;
     this.score = 500 + level * 100;
-    this.damage = 50;
+    this.damage = 55 + level * 4;
     this.next = null;
     this.scale = 2.5;
-    this.bossHp = 20 + level * 5;
+    this.bossHp = 40 + level * 14;
     this.maxBossHp = this.bossHp;
     this.pos = new Vec2(x, y);
-    this.vel = Vec2.fromAngle(Math.random() * Math.PI * 2, 0.5);
+    this.vel = Vec2.fromAngle(Math.random() * Math.PI * 2, 0.55);
     this.angle = 0;
     this.spin = 0.008;
     this.lurch = 0;
     this.limp = 1;
     this.wheelHitCd = 0;
     this.lightningFlash = 0;
-    this.bossAttackCd = 1200;
+    this.bossAttackCd = 900;
     this.attackFlash = 0;
+    this.chaseSpeed = 1.85 + level * 0.08;
   }
 
   updateBoss(playerX, playerY) {
     const dx = playerX - this.pos.x;
     const dy = playerY - this.pos.y;
     const dist = Math.hypot(dx, dy);
-    const chaseSpeed = 1.5;
+    const chaseSpeed = this.chaseSpeed || 1.85;
 
     if (dist > 5) {
       this.vel.set((dx / dist) * chaseSpeed, (dy / dist) * chaseSpeed);
@@ -76,7 +77,7 @@ export class Asteroid {
     if (this.bossAttackCd > 0) {
       this.bossAttackCd--;
     } else if (dist < 420) {
-      this.bossAttackCd = 1200;
+      this.bossAttackCd = Math.max(650, 1000 - this.maxBossHp * 2);
       this.attackFlash = 25;
       return true;
     }
