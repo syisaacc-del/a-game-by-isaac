@@ -45,6 +45,7 @@ export class Ship {
     this.maxHp = this.characterDef?.maxHp || 100;
     this.hp = this.maxHp;
     this.dead = false;
+    this.eliminated = false;
     this.respawnTimer = 0;
     this.shootCooldown = 0;
     this.invincible = 0;
@@ -62,6 +63,8 @@ export class Ship {
   }
 
   update() {
+    if (this.eliminated) return;
+
     if (this.dead) {
       if (++this.respawnTimer > 120) {
         this.dead = false;
