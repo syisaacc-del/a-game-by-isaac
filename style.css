@@ -402,14 +402,44 @@ canvas {
   color: #fff;
   padding: 8px 10px;
   font-family: inherit;
-  width: 120px;
+  width: 72px;
+  text-align: center;
+  letter-spacing: 0.12em;
 }
 
 .room-code {
   color: #ffcc00;
-  font-size: 22px;
+  font-size: 32px;
   font-weight: bold;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.25em;
+  margin: 4px 0 10px;
+}
+
+.mp-room-label {
+  color: #aaa;
+  font-size: 12px;
+  margin: 0;
+}
+
+#mp-status {
+  color: #fff;
+  margin: 0 0 8px;
+}
+
+#mp-ready-hint {
+  color: #888;
+  font-size: 11px;
+  margin: 8px 0 12px;
+}
+
+.mp-lobby {
+  pointer-events: auto;
+  text-align: center;
+  min-width: 220px;
+}
+
+#btn-mp-ready.ready {
+  opacity: 0.55;
 }
 
 #mp-modal {
