@@ -19,6 +19,8 @@ export class MultiplayerManager {
     this.remoteReady = false;
     this.remoteCharId = 'viktor';
     this.hostCharId = 'hayato';
+    this.remotePlayerName = '';
+    this.hostPlayerName = '';
   }
 
   setMode(mode) {
@@ -32,6 +34,8 @@ export class MultiplayerManager {
     this.remoteReady = false;
     this.remoteCharId = 'viktor';
     this.hostCharId = 'hayato';
+    this.remotePlayerName = '';
+    this.hostPlayerName = '';
     this.remoteInput = { dx: 0, dy: 0, shooting: false };
   }
 
@@ -63,6 +67,7 @@ export class MultiplayerManager {
     if (data.type === 'ready') {
       this.remoteReady = true;
       if (data.charId) this.remoteCharId = data.charId;
+      if (data.playerName) this.remotePlayerName = data.playerName;
       this.game.onRemoteReady();
       return;
     }
@@ -70,6 +75,8 @@ export class MultiplayerManager {
     if (data.type === 'start') {
       if (data.hostCharId) this.hostCharId = data.hostCharId;
       if (data.guestCharId) this.remoteCharId = data.guestCharId;
+      if (data.hostName) this.hostPlayerName = data.hostName;
+      if (data.guestName) this.remotePlayerName = data.guestName;
       this.game.startOnlineGame(data);
       return;
     }
@@ -163,9 +170,9 @@ export class MultiplayerManager {
     return this.isHost && this.guestConnected && this.localReady && this.remoteReady;
   }
 
-  sendReady(charId) {
+  sendReady(charId, playerName = '') {
     if (this.conn?.open) {
-      this.conn.send({ type: 'ready', charId });
+      this.conn.send({ type: 'ready', charId, playerName });
     }
   }
 
@@ -211,6 +218,9 @@ export class MultiplayerManager {
       level: g.level,
       lives: g.lives,
       lives2: g.lives2,
+      kills: g.killCount,
+      hostName: g.playerName,
+      guestName: g.player2Name,
       p1: {
         x: g.ship.pos.x,
         y: g.ship.pos.y,
