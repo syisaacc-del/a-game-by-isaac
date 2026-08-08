@@ -396,6 +396,30 @@ canvas {
   margin-top: 10px;
 }
 
+.mob-btn {
+  font-family: "Lucida Sans Typewriter", "Lucida Console", Monaco, monospace;
+  font-size: 14px;
+  font-weight: bold;
+  padding: 10px 16px;
+  border: 2px solid #666;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mob-btn-y {
+  color: #7ecf8e;
+  border-color: #7ecf8e;
+  background: rgba(126, 207, 142, 0.15);
+}
+
+.mob-btn-n {
+  color: #ff6666;
+  border-color: #ff6666;
+  background: rgba(255, 102, 102, 0.12);
+}
+
 .online-row input {
   background: #222;
   border: 1px solid #555;
@@ -435,18 +459,39 @@ canvas {
 .mp-lobby {
   pointer-events: auto;
   text-align: center;
-  min-width: 220px;
+  min-width: 260px;
+  background: rgba(16, 16, 16, 0.96);
+  border: 2px solid #ffcc00;
+  padding: 22px 24px;
+}
+
+#btn-mp-ready {
+  min-width: 140px;
+  font-size: 16px;
+  padding: 12px 20px;
 }
 
 #btn-mp-ready.ready {
-  opacity: 0.55;
+  opacity: 0.7;
+}
+
+#btn-mp-ready:disabled {
+  cursor: default;
+}
+
+.mp-keys {
+  color: #666;
+  font-size: 11px;
+  margin: 8px 0 0;
 }
 
 #mp-modal {
   position: absolute;
-  top: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 4;
-  pointer-events: none;
+  inset: 0;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.78);
+  pointer-events: auto;
 }
