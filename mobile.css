@@ -6,6 +6,8 @@ html[data-mobile="true"] body {
   overscroll-behavior: none;
   position: fixed;
   inset: 0;
+  width: 100%;
+  height: 100dvh;
 }
 
 html:not([data-mobile="true"]) #controls,
@@ -191,7 +193,7 @@ html[data-mobile="true"] #controls.controls-hidden {
   pointer-events: none;
 }
 
-html[data-mobile="true"] .modal-box {
-  width: min(100%, 320px);
-  padding: 20px 16px;
+html[data-mobile="true"] #mp-modal {
+  z-index: 8;
+  padding: 16px;
 }
