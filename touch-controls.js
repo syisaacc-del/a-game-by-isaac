@@ -11,6 +11,8 @@ export class TouchControls {
     this.stickX = 0;
     this.stickY = 0;
     this.maxRadius = 56;
+    this.deadzone = 0.18;
+    this.sensitivity = 0.52;
     this.dragonflyVisible = false;
     this.dragonflyCd = 0;
 
@@ -86,8 +88,19 @@ export class TouchControls {
     }
     this.stickX = ox;
     this.stickY = oy;
-    this.dx = ox / this.maxRadius;
-    this.dy = oy / this.maxRadius;
+    let nx = ox / this.maxRadius;
+    let ny = oy / this.maxRadius;
+    const mag = Math.hypot(nx, ny);
+    if (mag < this.deadzone) {
+      nx = 0;
+      ny = 0;
+    } else {
+      const t = (mag - this.deadzone) / (1 - this.deadzone);
+      nx = (nx / mag) * t * this.sensitivity;
+      ny = (ny / mag) * t * this.sensitivity;
+    }
+    this.dx = nx;
+    this.dy = ny;
     this.joystickStick.style.transform = `translate(${ox}px, ${oy}px)`;
   }
 
