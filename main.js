@@ -311,33 +311,46 @@ class Game {
   }
 
   showLeaderboard() {
-    this.renderLeaderboard();
     this.leaderboardModal?.classList.remove('hidden');
+    this.renderLeaderboard();
   }
 
   hideLeaderboard() {
     this.leaderboardModal?.classList.add('hidden');
   }
 
-  renderLeaderboard() {
+  escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  async renderLeaderboard() {
     if (!this.leaderboardListEl) return;
-    const rows = Leaderboard.top(15);
+    this.leaderboardListEl.innerHTML = '<p class="lb-meta" style="text-align:center;padding:16px">載入全服排行榜…</p>';
+
+    const rows = await Leaderboard.top(15);
+    const status = await Leaderboard.getStatusMessage();
+
     if (rows.length === 0) {
-      this.leaderboardListEl.innerHTML = '<p class="lb-meta" style="text-align:center;padding:20px">暫無紀錄，打一局先！</p>';
+      this.leaderboardListEl.innerHTML = `<p class="lb-meta" style="text-align:center;padding:20px">暫無紀錄，打一局先！</p><p class="lb-meta lb-cloud-status">${status}</p>`;
       return;
     }
+
     const head = '<div class="lb-row head"><span>#</span><span>玩家</span><span>得分</span></div>';
     const body = rows.map((r, i) => {
       const modeLabel = { solo: '單人', local: '本地', online: '線上' }[r.mode] || r.mode;
+      const name = this.escHtml(r.name);
       return `<div class="lb-row">
         <span class="lb-rank">${i + 1}</span>
-        <span><span class="lb-name">${r.name}</span>
+        <span><span class="lb-name">${name}</span>
           <div class="lb-meta">L${r.level} · 擊殺${r.kills} · Boss${r.bosses} · ${modeLabel} · ${formatBattleDate(r.date)}</div>
         </span>
         <span class="lb-score">${r.score}</span>
       </div>`;
     }).join('');
-    this.leaderboardListEl.innerHTML = head + body;
+    this.leaderboardListEl.innerHTML = `${head}${body}<p class="lb-meta lb-cloud-status">${status}</p>`;
   }
 
   buildBattleRecord(name, result) {
