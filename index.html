@@ -50,6 +50,11 @@
 
   </div>
 
+  <div id="live-scoreboard" class="hidden">
+    <div id="sb-p1" class="sb-row"></div>
+    <div id="sb-p2" class="sb-row hidden"></div>
+  </div>
+
   <div id="title-banner" class="hidden">
 
     <div class="title-rays"></div>
@@ -63,6 +68,7 @@
   <div id="overlay" class="hidden">
 
     <div id="overlay-text"></div>
+    <div id="overlay-stats" class="overlay-stats"></div>
 
     <p class="hint hint-desktop">按 SPACE 重新開始</p>
 
@@ -93,6 +99,18 @@
           <span class="char-talent">【雷電】連鎖 +1</span>
         </button>
       </div>
+      <div class="name-section">
+        <div class="name-row">
+          <label for="p1-name">玩家名稱</label>
+          <input id="p1-name" type="text" maxlength="12" placeholder="留空自動分配">
+          <button type="button" id="btn-random-p1" class="mob-btn">隨機</button>
+        </div>
+        <div class="name-row hidden" id="p2-name-row">
+          <label for="p2-name">P2 名稱</label>
+          <input id="p2-name" type="text" maxlength="12" placeholder="留空自動分配">
+          <button type="button" id="btn-random-p2" class="mob-btn">隨機</button>
+        </div>
+      </div>
       <div class="mode-btns">
         <button type="button" id="btn-solo" class="mob-btn mob-btn-y">單人 [Enter]</button>
         <button type="button" id="btn-local" class="mob-btn mob-btn-n">本地雙人 [L]</button>
@@ -102,6 +120,16 @@
         <input id="room-input" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="4位房號" maxlength="4">
         <button type="button" id="btn-online-join" class="mob-btn">加入</button>
       </div>
+      <div class="mode-btns" style="margin-top:8px">
+        <button type="button" id="btn-leaderboard" class="mob-btn">🏆 排行榜</button>
+      </div>
+    </div>
+  </div>
+  <div id="leaderboard-modal" class="hidden">
+    <div class="char-panel leaderboard-panel">
+      <h2>🏆 戰鬥排行榜</h2>
+      <div id="leaderboard-list" class="leaderboard-list"></div>
+      <button type="button" id="btn-leaderboard-close" class="mob-btn mob-btn-y">關閉</button>
     </div>
   </div>
   <div id="mp-modal" class="hidden">
