@@ -14,6 +14,7 @@ export class Ship {
     this.wheelOrbit = 200;
     this.wheelRadius = 42;
     this.playerIndex = 0;
+    this.displayName = '';
     this.characterDef = null;
     this.damageReduction = 0;
     this.extraChain = 0;
@@ -258,11 +259,12 @@ export class Ship {
     drawEquipFx(ctx, this);
     drawCharacter(ctx, this);
 
-    if (this.playerIndex === 1) {
-      ctx.fillStyle = '#7ecf8e';
+    const tag = this.displayName || (this.playerIndex === 1 ? 'P2' : '');
+    if (tag) {
+      ctx.fillStyle = this.playerIndex === 1 ? '#7ecf8e' : '#ffcc00';
       ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('P2', this.pos.x, this.pos.y - 22);
+      ctx.fillText(tag, this.pos.x, this.pos.y - 22);
     }
   }
 }
