@@ -1,6 +1,8 @@
 import { FIREBASE_DB_URL, isCloudLeaderboardEnabled } from './leaderboard-config.js';
 
-const DB_BASE = FIREBASE_DB_URL.replace(/\/+$/, '');const CACHE_MS = 45_000;
+const DB_BASE = FIREBASE_DB_URL.replace(/\/+$/, '');
+const CACHE_KEY = 'zs-cloud-leaderboard-cache';
+const CACHE_MS = 45_000;
 
 function normalizeRecord(raw) {
   return {
