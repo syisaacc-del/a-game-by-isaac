@@ -79,27 +79,59 @@ export class MultiplayerManager {
     }
   }
 
-  async hostOnline() {
-    if (typeof Peer === 'undefined') throw new Error('PeerJS 未載入');
+  tryHostWithCode(code) {
     return new Promise((resolve, reject) => {
-      this.disconnect();
-      this.isHost = true;
-      this.mode = 'online';
-      this.roomId = randomRoomCode();
-      this.peer = new Peer(this.roomId);
-      this.peer.on('open', (id) => {
+      const peer = new Peer(code);
+      const cleanup = () => {
+        peer.removeAllListeners();
+      };
+
+      peer.on('open', (id) => {
+        if (!/^\d{4}$/.test(id)) {
+          cleanup();
+          peer.destroy();
+          reject(Object.assign(new Error('invalid peer id'), { type: 'unavailable-id' }));
+          return;
+        }
+        this.peer = peer;
         this.roomId = id;
+        peer.on('connection', (conn) => {
+          this.wireConnection(conn);
+          conn.on('open', () => {
+            this.guestConnected = true;
+            this.game.onGuestJoined();
+          });
+        });
+        peer.on('error', (err) => {
+          if (err.type === 'unavailable-id') return;
+          this.game.showPickupMsg('連線中斷');
+        });
         resolve(id);
       });
-      this.peer.on('connection', (conn) => {
-        this.wireConnection(conn);
-        conn.on('open', () => {
-          this.guestConnected = true;
-          this.game.onGuestJoined();
-        });
+
+      peer.on('error', (err) => {
+        cleanup();
+        peer.destroy();
+        reject(err);
       });
-      this.peer.on('error', reject);
     });
+  }
+
+  async hostOnline() {
+    if (typeof Peer === 'undefined') throw new Error('PeerJS 未載入');
+    this.disconnect();
+    this.isHost = true;
+    this.mode = 'online';
+
+    for (let i = 0; i < 10; i++) {
+      const code = randomRoomCode();
+      try {
+        return await this.tryHostWithCode(code);
+      } catch (err) {
+        if (err?.type !== 'unavailable-id') throw err;
+      }
+    }
+    throw new Error('無法建立房間，請稍後再試');
   }
 
   async joinOnline(roomId) {
@@ -179,12 +211,19 @@ export class MultiplayerManager {
       level: g.level,
       lives: g.lives,
       lives2: g.lives2,
-      p1: { x: g.ship.pos.x, y: g.ship.pos.y, hp: g.ship.hp, dead: g.ship.dead },
+      p1: {
+        x: g.ship.pos.x,
+        y: g.ship.pos.y,
+        hp: g.ship.hp,
+        dead: g.ship.dead,
+        eliminated: g.ship.eliminated,
+      },
       p2: g.ship2 ? {
         x: g.ship2.pos.x,
         y: g.ship2.pos.y,
         hp: g.ship2.hp,
         dead: g.ship2.dead,
+        eliminated: g.ship2.eliminated,
       } : null,
     });
   }
