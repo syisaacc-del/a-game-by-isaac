@@ -1,0 +1,197 @@
+html[data-mobile="true"],
+html[data-mobile="true"] body {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+  position: fixed;
+  inset: 0;
+}
+
+html:not([data-mobile="true"]) #controls,
+html:not([data-mobile="true"]) .modal-btns,
+html:not([data-mobile="true"]) .hint-mobile {
+  display: none;
+}
+
+html[data-mobile="true"] #info,
+html[data-mobile="true"] .modal-keys,
+html[data-mobile="true"] .hint-desktop {
+  display: none;
+}
+
+html[data-mobile="true"] #overlay {
+  pointer-events: auto;
+  z-index: 5;
+}
+
+html[data-mobile="true"] #level-modal {
+  pointer-events: auto;
+  z-index: 6;
+  padding: 16px;
+}
+
+html[data-mobile="true"] #hud {
+  top: max(8px, env(safe-area-inset-top));
+  left: 8px;
+  right: 8px;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  background: rgba(10, 10, 10, 0.75);
+}
+
+html[data-mobile="true"] #hud #equip {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-width: none;
+  text-align: center;
+  font-size: 10px;
+}
+
+html[data-mobile="true"] #title-banner {
+  padding-top: max(36px, calc(env(safe-area-inset-top) + 28px));
+}
+
+html[data-mobile="true"] #title-banner .title-name {
+  font-size: clamp(28px, 9vw, 48px);
+}
+
+html[data-mobile="true"] #overlay-text {
+  font-size: clamp(28px, 8vw, 42px);
+}
+
+html[data-mobile="true"] .modal-btns {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+html[data-mobile="true"] .mob-btn {
+  flex: 1;
+  font-family: "Lucida Sans Typewriter", "Lucida Console", Monaco, monospace;
+  font-size: 16px;
+  font-weight: bold;
+  padding: 14px 8px;
+  border: 2px solid;
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+html[data-mobile="true"] .mob-btn-y {
+  color: #7ecf8e;
+  border-color: #7ecf8e;
+  background: rgba(126, 207, 142, 0.2);
+}
+
+html[data-mobile="true"] .mob-btn-n {
+  color: #ff6666;
+  border-color: #ff6666;
+  background: rgba(255, 102, 102, 0.2);
+}
+
+html[data-mobile="true"] #controls {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+html[data-mobile="true"] .joystick-zone {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 45%;
+  height: 42%;
+  pointer-events: auto;
+}
+
+html[data-mobile="true"] .joystick-base {
+  position: fixed;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+html[data-mobile="true"] .joystick-base.hidden {
+  display: none;
+}
+
+html[data-mobile="true"] .joystick-stick {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.2);
+}
+
+html[data-mobile="true"] .action-btn {
+  position: absolute;
+  pointer-events: auto;
+  border: none;
+  border-radius: 50%;
+  font-family: monospace;
+  font-weight: bold;
+  color: #fff;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  transition: transform 0.08s, opacity 0.08s;
+}
+
+html[data-mobile="true"] .action-btn.pressed {
+  transform: scale(0.92);
+  opacity: 0.85;
+}
+
+html[data-mobile="true"] .shoot-btn {
+  right: max(20px, env(safe-area-inset-right));
+  bottom: max(28px, env(safe-area-inset-bottom));
+  width: 76px;
+  height: 76px;
+  font-size: 28px;
+  background: radial-gradient(circle at 35% 35%, #ff8866, #cc3322);
+  border: 3px solid rgba(255, 200, 180, 0.5);
+}
+
+html[data-mobile="true"] .dragonfly-btn {
+  right: max(24px, env(safe-area-inset-right));
+  bottom: max(120px, calc(env(safe-area-inset-bottom) + 92px));
+  width: 64px;
+  height: 64px;
+  font-size: 13px;
+  background: radial-gradient(circle at 35% 35%, #66eeff, #0088aa);
+  border: 3px solid rgba(180, 255, 255, 0.5);
+}
+
+html[data-mobile="true"] .dragonfly-btn.cooldown {
+  background: radial-gradient(circle at 35% 35%, #556677, #334455);
+  font-size: 15px;
+  opacity: 0.7;
+}
+
+html[data-mobile="true"] .dragonfly-btn.hidden {
+  display: none;
+}
+
+html[data-mobile="true"] #controls.controls-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+html[data-mobile="true"] .modal-box {
+  width: min(100%, 320px);
+  padding: 20px 16px;
+}
