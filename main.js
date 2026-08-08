@@ -53,6 +53,9 @@ class Game {
     this.mpModal = document.getElementById('mp-modal');
     this.roomCodeEl = document.getElementById('room-code');
     this.roomInputEl = document.getElementById('room-input');
+    this.mpStatusEl = document.getElementById('mp-status');
+    this.mpReadyHintEl = document.getElementById('mp-ready-hint');
+    this.btnMpReadyEl = document.getElementById('btn-mp-ready');
 
     this.keys = {};
     this.w = 0;
@@ -145,6 +148,7 @@ class Game {
     document.getElementById('btn-local')?.addEventListener('click', () => this.beginLocal());
     document.getElementById('btn-online-host')?.addEventListener('click', () => this.beginOnlineHost());
     document.getElementById('btn-online-join')?.addEventListener('click', () => this.beginOnlineJoin());
+    this.btnMpReadyEl?.addEventListener('click', () => this.setLobbyReady(true));
   }
 
   bindMobileEvents() {
@@ -164,6 +168,7 @@ class Game {
     document.getElementById('btn-local')?.addEventListener('click', () => this.beginLocal());
     document.getElementById('btn-online-host')?.addEventListener('click', () => this.beginOnlineHost());
     document.getElementById('btn-online-join')?.addEventListener('click', () => this.beginOnlineJoin());
+    this.btnMpReadyEl?.addEventListener('click', () => this.setLobbyReady(true));
 
     const btnY = document.getElementById('btn-boss-y');
     const btnN = document.getElementById('btn-boss-n');
@@ -210,11 +215,24 @@ class Game {
 
   showCharSelect() {
     this.state = 'charSelect';
+    this.multiplayer.disconnect();
+    this.multiplayer.setMode('solo');
     this.hideOverlay();
     this.hideLevelModal();
+    this.hideMpModal();
     this.charModal?.classList.remove('hidden');
     this.highlightCharCard();
+    if (this.mobile && this.touch) this.touch.setVisible(false);
+  }
+
+  hideMpModal() {
     this.mpModal?.classList.add('hidden');
+    if (this.roomCodeEl) this.roomCodeEl.textContent = '';
+    this.btnMpReadyEl?.classList.remove('ready');
+  }
+
+  showMpModal() {
+    this.mpModal?.classList.remove('hidden');
     if (this.mobile && this.touch) this.touch.setVisible(false);
   }
 
@@ -241,10 +259,19 @@ class Game {
 
     if (this.playMode === 'local' || this.playMode === 'online') {
       if (!this.ship2) this.ship2 = new Ship();
-      const def2 = getCharacter(this.selectedChar2Id);
+      const p2Id = this.playMode === 'online' && !this.multiplayer.isHost
+        ? this.selectedCharId
+        : this.selectedChar2Id;
+      const def2 = getCharacter(p2Id);
       this.ship2.applyCharacter(def2);
       this.ship2.playerIndex = 1;
       this.ship2.setScreenSize(this.w, this.h);
+
+      if (this.playMode === 'online' && !this.multiplayer.isHost) {
+        const hostDef = getCharacter(this.multiplayer.hostCharId);
+        this.ship.applyCharacter(hostDef);
+        this.ship.playerIndex = 0;
+      }
     } else {
       this.ship2 = null;
     }
@@ -270,41 +297,191 @@ class Game {
     try {
       this.playMode = 'online';
       this.multiplayer.setMode('online');
-      const ids = CHARACTERS.map((c) => c.id).filter((id) => id !== this.selectedCharId);
-      this.selectedChar2Id = ids[0] || 'viktor';
       const code = await this.multiplayer.hostOnline();
       if (this.roomCodeEl) this.roomCodeEl.textContent = code;
-      this.mpModal?.classList.remove('hidden');
+      this.state = 'onlineLobby';
       this.hideCharSelect();
-      this.startGame();
+      this.showMpModal();
+      this.updateLobbyUI();
     } catch (e) {
-      this.showPickupMsg('線上模式失敗，請試本地雙人');
+      this.showPickupMsg('線上開房失敗，請稍後再試');
     }
   }
 
   async beginOnlineJoin() {
     const code = this.roomInputEl?.value?.trim();
-    if (!code) return;
+    if (!/^\d{4}$/.test(code || '')) {
+      this.showPickupMsg('請輸入4位數字房間碼');
+      return;
+    }
     try {
       this.playMode = 'online';
       this.multiplayer.setMode('online');
-      this.selectedChar2Id = this.selectedCharId;
       await this.multiplayer.joinOnline(code);
+      this.state = 'onlineLobby';
+      if (this.roomCodeEl) this.roomCodeEl.textContent = code;
       this.hideCharSelect();
-      this.startGame();
+      this.showMpModal();
+      this.updateLobbyUI();
     } catch (e) {
       this.showPickupMsg('加入失敗，檢查房間碼');
     }
   }
 
+  updateLobbyUI() {
+    const mp = this.multiplayer;
+    const host = mp.isHost;
+    const joined = mp.guestConnected || !host;
+    const localReady = mp.localReady;
+    const remoteReady = mp.remoteReady;
+
+    if (this.mpStatusEl) {
+      if (!joined) {
+        this.mpStatusEl.textContent = host ? '等待隊友加入…' : '已連線，等待房主…';
+      } else if (!localReady && !remoteReady) {
+        this.mpStatusEl.textContent = '隊友已加入，請按準備';
+      } else if (localReady && !remoteReady) {
+        this.mpStatusEl.textContent = '已準備，等待對方…';
+      } else if (!localReady && remoteReady) {
+        this.mpStatusEl.textContent = '對方已準備，請按準備';
+      } else {
+        this.mpStatusEl.textContent = '雙方已準備，即將開始…';
+      }
+    }
+
+    if (this.mpReadyHintEl) {
+      this.mpReadyHintEl.textContent = host
+        ? '你是 P1（房主）· 隊友係 P2'
+        : '你是 P2 · 房主係 P1';
+    }
+
+    this.btnMpReadyEl?.classList.toggle('ready', localReady);
+    if (this.btnMpReadyEl) {
+      this.btnMpReadyEl.textContent = localReady ? '已準備 ✓' : '準備';
+      this.btnMpReadyEl.disabled = localReady;
+    }
+  }
+
+  onGuestJoined() {
+    this.updateLobbyUI();
+    this.showPickupMsg('隊友已加入！');
+  }
+
+  onRemoteReady() {
+    this.updateLobbyUI();
+    if (this.multiplayer.canStart()) {
+      this.multiplayer.sendStart({
+        hostCharId: this.selectedCharId,
+        guestCharId: this.multiplayer.remoteCharId,
+      });
+      this.startOnlineGame({
+        hostCharId: this.selectedCharId,
+        guestCharId: this.multiplayer.remoteCharId,
+      });
+    }
+  }
+
+  setLobbyReady(ready) {
+    if (this.state !== 'onlineLobby') return;
+    this.multiplayer.setLocalReady(ready);
+    this.multiplayer.sendReady(this.selectedCharId);
+    this.updateLobbyUI();
+    if (this.multiplayer.isHost) {
+      if (this.multiplayer.canStart()) {
+        this.multiplayer.sendStart({
+          hostCharId: this.selectedCharId,
+          guestCharId: this.multiplayer.remoteCharId,
+        });
+        this.startOnlineGame({
+          hostCharId: this.selectedCharId,
+          guestCharId: this.multiplayer.remoteCharId,
+        });
+      }
+    }
+  }
+
+  startOnlineGame(data = {}) {
+    if (data.hostCharId) this.multiplayer.hostCharId = data.hostCharId;
+    if (data.guestCharId) {
+      this.multiplayer.remoteCharId = data.guestCharId;
+      this.selectedChar2Id = data.guestCharId;
+    }
+    this.hideMpModal();
+    if (this.mobile && this.touch) this.touch.setVisible(true);
+    this.startGame();
+    const role = this.multiplayer.isHost ? 'P1 房主' : 'P2 隊友';
+    this.showPickupMsg(`對戰開始 · ${role}`);
+  }
+
   applyNetworkState(data) {
-    if (this.multiplayer.isHost) return;
+    if (this.multiplayer.isHost || data.type !== 'state') return;
+
     this.score = data.score ?? this.score;
     this.level = data.level ?? this.level;
+    this.lives = data.lives ?? this.lives;
+    this.lives2 = data.lives2 ?? this.lives2;
+
     if (data.p1) {
       this.ship.pos.x = data.p1.x;
       this.ship.pos.y = data.p1.y;
       this.ship.hp = data.p1.hp;
+      this.ship.dead = !!data.p1.dead;
+    }
+    if (data.p2 && this.ship2) {
+      this.ship2.pos.x = data.p2.x;
+      this.ship2.pos.y = data.p2.y;
+      this.ship2.hp = data.p2.hp;
+      this.ship2.dead = !!data.p2.dead;
+    }
+
+    if (data.asteroids) this.syncAsteroidsFromNetwork(data.asteroids);
+    if (data.bullets) this.syncBulletsFromNetwork(data.bullets);
+    this.updateHud();
+  }
+
+  syncAsteroidsFromNetwork(list) {
+    while (this.asteroids.length > list.length) {
+      const a = this.asteroids.pop();
+      a.reset();
+      this.asteroidPool.release(a);
+    }
+
+    for (let i = 0; i < list.length; i++) {
+      const d = list[i];
+      let a = this.asteroids[i];
+      if (!a) {
+        a = this.asteroidPool.acquire();
+        if (!a) continue;
+        if (d.isBoss) a.spawnBoss(d.x, d.y, this.level);
+        else a.spawn(d.x, d.y, d.type, this.speedBoost);
+        this.asteroids.push(a);
+      }
+      a.pos.x = d.x;
+      a.pos.y = d.y;
+      if (d.isBoss) {
+        a.bossHp = d.bossHp;
+        a.maxBossHp = d.maxBossHp;
+      }
+    }
+  }
+
+  syncBulletsFromNetwork(list) {
+    for (const b of this.bullets) {
+      b.reset();
+      this.bulletPool.release(b);
+    }
+    this.bullets = [];
+
+    for (const d of list) {
+      const b = this.bulletPool.acquire();
+      if (!b) break;
+      b.spawn({
+        pos: { x: d.x, y: d.y },
+        vel: { x: d.vx, y: d.vy },
+        radius: 4,
+        life: 60,
+      });
+      this.bullets.push(b);
     }
   }
 
@@ -577,13 +754,24 @@ class Game {
 
   input() {
     if (this.state !== 'playing') return;
-    this.inputShip(this.ship, this.mobile && this.touch ? this.touch.getInput() : null, {
-      left: this.playMode === 'local' ? ['KeyA'] : ['ArrowLeft', 'KeyA'],
-      right: this.playMode === 'local' ? ['KeyD'] : ['ArrowRight', 'KeyD'],
-      up: this.playMode === 'local' ? ['KeyW'] : ['ArrowUp', 'KeyW'],
-      down: this.playMode === 'local' ? ['KeyS'] : ['ArrowDown', 'KeyS'],
-      shoot: ['Space', 'KeyK'],
-    });
+
+    if (this.playMode === 'online' && !this.multiplayer.isHost) {
+      const touch = this.mobile && this.touch ? this.touch.getInput() : null;
+      this.multiplayer.sendInput(this.readPlayerInput(touch, {
+        left: ['ArrowLeft', 'KeyA'],
+        right: ['ArrowRight', 'KeyD'],
+        up: ['ArrowUp', 'KeyW'],
+        down: ['ArrowDown', 'KeyS'],
+        shoot: ['Space', 'KeyK'],
+      }));
+      return;
+    }
+
+    const p1Keys = this.playMode === 'local'
+      ? { left: ['KeyA'], right: ['KeyD'], up: ['KeyW'], down: ['KeyS'], shoot: ['Space', 'KeyK'] }
+      : { left: ['ArrowLeft', 'KeyA'], right: ['ArrowRight', 'KeyD'], up: ['ArrowUp', 'KeyW'], down: ['ArrowDown', 'KeyS'], shoot: ['Space', 'KeyK'] };
+
+    this.inputShip(this.ship, this.mobile && this.touch ? this.touch.getInput() : null, p1Keys);
 
     if (this.ship2 && this.playMode === 'local') {
       this.inputShip(this.ship2, null, {
@@ -596,6 +784,26 @@ class Game {
         left: [], right: [], up: [], down: [], shoot: [],
       });
     }
+  }
+
+  readPlayerInput(touch, keys) {
+    let dx = 0;
+    let dy = 0;
+    let shooting = false;
+
+    if (touch) {
+      dx = touch.dx;
+      dy = touch.dy;
+      shooting = touch.shooting;
+    } else {
+      if (keys.left.some((k) => this.keys[k])) dx -= 1;
+      if (keys.right.some((k) => this.keys[k])) dx += 1;
+      if (keys.up.some((k) => this.keys[k])) dy -= 1;
+      if (keys.down.some((k) => this.keys[k])) dy += 1;
+      shooting = keys.shoot.some((k) => this.keys[k]);
+    }
+
+    return { dx, dy, shooting };
   }
 
   inputShip(ship, touch, keys) {
@@ -652,8 +860,17 @@ class Game {
       this.charPreviewT += 0.04;
       return;
     }
+    if (this.state === 'onlineLobby') return;
     if (this.state === 'levelPrompt') return;
     if (this.state !== 'playing') return;
+
+    if (this.playMode === 'online' && !this.multiplayer.isHost) {
+      this.input();
+      this.ship.update();
+      if (this.ship2) this.ship2.update();
+      if (this.pickupMsgTimer > 0 && --this.pickupMsgTimer <= 0) this.pickupMsg = '';
+      return;
+    }
 
     this.input();
     this.ship.update();
@@ -1065,7 +1282,7 @@ class Game {
     ctx.fillRect(0, 0, this.w, this.h);
     ctx.globalAlpha = 1;
 
-    if (this.state === 'charSelect') {
+    if (this.state === 'charSelect' || this.state === 'onlineLobby') {
       this.renderScanlines();
       return;
     }
