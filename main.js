@@ -68,6 +68,7 @@ class Game {
     this.selectedCharId = 'hayato';
     this.selectedChar2Id = 'viktor';
     this.playMode = 'solo';
+    this.onlineStarted = false;
     this.multiplayer = new MultiplayerManager(this);
     this.lives2 = 3;
     const particleCount = this.mobile ? 180 : 300;
@@ -99,9 +100,14 @@ class Game {
     this.titleSparklePhase = 0;
     this.screenFlash = 0;
     this.dragonflyWave = null;
+    this.levelsSinceBoss = 0;
+    this.fullscreenRequested = false;
 
     this.bindEvents();
     this.resize();
+    if (this.mobile) {
+      document.body.addEventListener('touchstart', () => this.requestMobileFullscreen(), { once: true });
+    }
     this.showCharSelect();
     requestAnimationFrame(this.loop.bind(this));
   }
@@ -128,6 +134,13 @@ class Game {
         if (e.code === 'Digit3') this.selectCharacter('zara');
         if (e.code === 'Enter') this.beginSolo();
         if (e.code === 'KeyL') this.beginLocal();
+      }
+
+      if (this.state === 'onlineLobby') {
+        if ((e.code === 'Enter' || e.code === 'KeyR') && !this.multiplayer.localReady) {
+          e.preventDefault();
+          this.setLobbyReady(true);
+        }
       }
 
       if (this.state === 'levelPrompt') {
@@ -215,6 +228,7 @@ class Game {
 
   showCharSelect() {
     this.state = 'charSelect';
+    this.onlineStarted = false;
     this.multiplayer.disconnect();
     this.multiplayer.setMode('solo');
     this.hideOverlay();
@@ -350,9 +364,11 @@ class Game {
     }
 
     if (this.mpReadyHintEl) {
-      this.mpReadyHintEl.textContent = host
-        ? '你是 P1（房主）· 隊友係 P2'
-        : '你是 P2 · 房主係 P1';
+      const role = host ? '你是 P1（房主）' : '你是 P2（隊友）';
+      const need = !localReady
+        ? '請按下方「準備」'
+        : (!remoteReady ? '已準備，等對方按準備…' : '即將開始…');
+      this.mpReadyHintEl.textContent = `${role} · ${need}`;
     }
 
     this.btnMpReadyEl?.classList.toggle('ready', localReady);
@@ -369,38 +385,32 @@ class Game {
 
   onRemoteReady() {
     this.updateLobbyUI();
-    if (this.multiplayer.canStart()) {
-      this.multiplayer.sendStart({
-        hostCharId: this.selectedCharId,
-        guestCharId: this.multiplayer.remoteCharId,
-      });
-      this.startOnlineGame({
-        hostCharId: this.selectedCharId,
-        guestCharId: this.multiplayer.remoteCharId,
-      });
-    }
+    this.tryStartMatch();
+  }
+
+  tryStartMatch() {
+    if (!this.multiplayer.canStart() || this.onlineStarted) return;
+    this.multiplayer.sendStart({
+      hostCharId: this.selectedCharId,
+      guestCharId: this.multiplayer.remoteCharId,
+    });
+    this.startOnlineGame({
+      hostCharId: this.selectedCharId,
+      guestCharId: this.multiplayer.remoteCharId,
+    });
   }
 
   setLobbyReady(ready) {
-    if (this.state !== 'onlineLobby') return;
+    if (this.state !== 'onlineLobby' || this.multiplayer.localReady) return;
     this.multiplayer.setLocalReady(ready);
     this.multiplayer.sendReady(this.selectedCharId);
     this.updateLobbyUI();
-    if (this.multiplayer.isHost) {
-      if (this.multiplayer.canStart()) {
-        this.multiplayer.sendStart({
-          hostCharId: this.selectedCharId,
-          guestCharId: this.multiplayer.remoteCharId,
-        });
-        this.startOnlineGame({
-          hostCharId: this.selectedCharId,
-          guestCharId: this.multiplayer.remoteCharId,
-        });
-      }
-    }
+    if (this.multiplayer.isHost) this.tryStartMatch();
   }
 
   startOnlineGame(data = {}) {
+    if (this.onlineStarted || this.state === 'playing') return;
+    this.onlineStarted = true;
     if (data.hostCharId) this.multiplayer.hostCharId = data.hostCharId;
     if (data.guestCharId) {
       this.multiplayer.remoteCharId = data.guestCharId;
@@ -426,12 +436,20 @@ class Game {
       this.ship.pos.y = data.p1.y;
       this.ship.hp = data.p1.hp;
       this.ship.dead = !!data.p1.dead;
+      this.ship.eliminated = !!data.p1.eliminated;
     }
     if (data.p2 && this.ship2) {
       this.ship2.pos.x = data.p2.x;
       this.ship2.pos.y = data.p2.y;
       this.ship2.hp = data.p2.hp;
       this.ship2.dead = !!data.p2.dead;
+      this.ship2.eliminated = !!data.p2.eliminated;
+    }
+
+    if (!this.multiplayer.isHost && this.ship2?.eliminated) {
+      this.state = 'gameover';
+      this.showOverlay('GAME OVER');
+      if (this.mobile && this.touch) this.touch.setVisible(false);
     }
 
     if (data.asteroids) this.syncAsteroidsFromNetwork(data.asteroids);
@@ -491,11 +509,34 @@ class Game {
     return list;
   }
 
+  getActivePlayers() {
+    return this.getPlayers().filter((p) => !p.eliminated && !p.dead);
+  }
+
+  allPlayersEliminated() {
+    const p1Out = this.lives <= 0 || this.ship.eliminated;
+    if (!this.ship2) return p1Out;
+    return p1Out && (this.lives2 <= 0 || this.ship2.eliminated);
+  }
+
+  requestMobileFullscreen() {
+    if (!this.mobile || this.fullscreenRequested) return;
+    this.fullscreenRequested = true;
+    const el = document.documentElement;
+    const fn = el.requestFullscreen
+      || el.webkitRequestFullscreen
+      || el.webkitEnterFullscreen;
+    if (fn) {
+      Promise.resolve(fn.call(el)).catch(() => {});
+    }
+  }
+
   nearestPlayer(x, y) {
-    let best = this.ship;
+    const players = this.getActivePlayers();
+    if (players.length === 0) return this.ship;
+    let best = players[0];
     let bestD = Infinity;
-    for (const p of this.getPlayers()) {
-      if (p.dead) continue;
+    for (const p of players) {
       const d = Math.hypot(p.pos.x - x, p.pos.y - y);
       if (d < bestD) { bestD = d; best = p; }
     }
@@ -522,6 +563,7 @@ class Game {
     this.screenFlash = 0;
     this.dragonflyWave = null;
     this.lightningArcs = [];
+    this.levelsSinceBoss = 0;
     this.hideLevelModal();
     this.clearEntities();
     this.setupShips();
@@ -536,6 +578,7 @@ class Game {
     this.spawnLevel();
     this.updateHud();
     this.hideOverlay();
+    this.requestMobileFullscreen();
     const c = getCharacter(this.selectedCharId);
     this.showPickupMsg(`${c.flag} ${c.name} · 天賦【${c.talent}】`);
   }
@@ -552,7 +595,7 @@ class Game {
   }
 
   zombieCountForLevel() {
-    return Math.max(3, Math.floor((3 + this.level) * Math.pow(1.5, this.level - 1)));
+    return Math.min(20, 3 + Math.floor(this.level * 1.6));
   }
 
   randomPos(minDist = 100) {
@@ -614,6 +657,7 @@ class Game {
   }
 
   startBossFight() {
+    this.levelsSinceBoss = 0;
     for (const a of [...this.asteroids]) {
       if (!a.isBoss) { a.active = false; }
     }
@@ -692,11 +736,26 @@ class Game {
 
   onWaveClear() {
     this.level++;
-    this.speedBoost += 0.3;
-    this.ship.invincible = Math.max(this.ship.invincible, 90);
-    this.state = 'levelPrompt';
-    this.showLevelModal();
-    this.showPickupMsg(`LEVEL ${this.level} 清關！`);
+    this.levelsSinceBoss++;
+    this.speedBoost += 0.12;
+    if (!this.ship.eliminated) {
+      this.ship.invincible = Math.max(this.ship.invincible, 90);
+    }
+    if (this.ship2 && !this.ship2.eliminated) {
+      this.ship2.invincible = Math.max(this.ship2.invincible, 90);
+    }
+
+    const canOfferBoss = this.level >= 3 && this.levelsSinceBoss >= 2;
+    if (canOfferBoss) {
+      this.state = 'levelPrompt';
+      this.showLevelModal();
+      this.showPickupMsg(`LEVEL ${this.level} 清關！`);
+    } else {
+      this.state = 'playing';
+      this.spawnLevel();
+      if (this.level >= 2) this.spawnSpecialReward();
+      this.showPickupMsg(`LEVEL ${this.level} 開始`);
+    }
     this.updateHud();
   }
 
@@ -807,7 +866,7 @@ class Game {
   }
 
   inputShip(ship, touch, keys) {
-    if (ship.dead) return;
+    if (ship.dead || ship.eliminated) return;
     let dx = 0;
     let dy = 0;
     let shooting = false;
@@ -1010,20 +1069,34 @@ class Game {
   }
 
   handlePlayerDeath(ship = this.ship) {
+    if (ship.eliminated) return;
     burst(this.particlePool, this.particles, ship.pos.x, ship.pos.y, 20, '#fff', 2, 8, 1, 5);
-    if (ship.playerIndex === 1) {
-      this.lives2--;
-    } else {
-      this.lives--;
-    }
+    const isP2 = ship.playerIndex === 1;
+    if (isP2) this.lives2--;
+    else this.lives--;
     this.updateHud();
-    const livesLeft = this.lives + (this.ship2 ? this.lives2 : 0);
+
+    const livesLeft = isP2 ? this.lives2 : this.lives;
+    const label = isP2 ? 'P2' : 'P1';
+
     if (livesLeft <= 0) {
+      ship.eliminated = true;
+      ship.kill();
+      this.showPickupMsg(`${label} 已出局`);
+
+      if (this.playMode === 'online' && !this.multiplayer.isHost && isP2) {
+        this.state = 'gameover';
+        this.showOverlay('GAME OVER');
+        if (this.mobile && this.touch) this.touch.setVisible(false);
+      }
+    } else {
+      ship.kill();
+    }
+
+    if (this.allPlayersEliminated()) {
       this.state = 'gameover';
       this.showOverlay('GAME OVER');
-    } else {
-      ship.respawnTimer = 0;
-      ship.kill();
+      if (this.mobile && this.touch) this.touch.setVisible(false);
     }
   }
 
@@ -1034,6 +1107,7 @@ class Game {
     if (a.isBoss) {
       this.bossActive = false;
       this.bossFight = false;
+      this.levelsSinceBoss = 0;
       this.setDragonflyUnlocked(true);
       this.showPickupMsg('Boss 擊敗！蜻蜓必殺已解鎖 [Y]');
       this.spawnLevel();
@@ -1086,7 +1160,7 @@ class Game {
   checkShipHit() {
     if (this.bossFight) return;
     for (const ship of this.getPlayers()) {
-      if (ship.dead || ship.invincible > 0) continue;
+      if (ship.eliminated || ship.dead || ship.invincible > 0) continue;
       for (const a of this.asteroids) {
         if (this.hit(ship, a)) {
           if (ship.damage(a.damage)) this.handlePlayerDeath(ship);
@@ -1118,7 +1192,7 @@ class Game {
       if (!pk.active) continue;
       const def = PICKUP_TYPES[pk.type];
       for (const ship of this.getPlayers()) {
-        if (ship.dead) continue;
+        if (ship.eliminated || ship.dead) continue;
         if (!this.hit(ship, pk)) continue;
         this.applyPickupToShip(ship, pk, def);
         pk.active = false;
@@ -1128,7 +1202,8 @@ class Game {
   }
 
   checkLevelClear() {
-    const anyoneAlive = this.getPlayers().some((p) => !p.dead);
+    const anyoneAlive = this.getActivePlayers().length > 0
+      || this.getPlayers().some((p) => !p.eliminated && p.dead);
     if (this.asteroids.length === 0 && anyoneAlive && this.state === 'playing' && !this.bossFight) {
       this.onWaveClear();
     }
@@ -1160,9 +1235,9 @@ class Game {
     };
 
     if (this.ship2) {
-      drawBar(this.ship, 16, 'P1');
-      drawBar(this.ship2, this.w - barW - 16, 'P2');
-    } else {
+      if (!this.ship.eliminated) drawBar(this.ship, 16, 'P1');
+      if (!this.ship2.eliminated) drawBar(this.ship2, this.w - barW - 16, 'P2');
+    } else if (!this.ship.eliminated) {
       drawBar(this.ship, (this.w - barW) / 2, 'HP');
     }
 
@@ -1292,8 +1367,8 @@ class Game {
     for (const b of this.bullets) b.draw(ctx);
     for (const arc of this.lightningArcs) this.drawLightningArc(ctx, arc);
     for (const p of this.particles) p.draw(ctx);
-    this.ship.draw(ctx);
-    if (this.ship2) this.ship2.draw(ctx);
+    if (!this.ship.eliminated) this.ship.draw(ctx);
+    if (this.ship2 && !this.ship2.eliminated) this.ship2.draw(ctx);
 
     if (this.screenFlash > 0) {
       ctx.fillStyle = `rgba(80,240,255,${this.screenFlash / 28})`;
