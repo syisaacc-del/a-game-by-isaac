@@ -596,6 +596,12 @@ canvas {
   text-align: right;
 }
 
+.lb-cloud-status {
+  text-align: center;
+  margin-top: 10px;
+  color: #7ecf8e;
+}
+
 #live-scoreboard {
   position: absolute;
   top: 52px;
