@@ -1,3 +1,6 @@
+import { fetchCloudRecords, submitCloudRecord } from './cloud-leaderboard.js';
+import { isCloudLeaderboardEnabled } from './leaderboard-config.js';
+
 const NAME_PREFIXES = [
   '倖存者', '獵手', '戰士', '幽靈', '閃電', '鐵壁', '幻影', '雷霆', '狂徒', '利刃', '夜鷹', '赤焰',
 ];
@@ -40,8 +43,22 @@ export function formatBattleDate(ts) {
   return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function normalizeEntry(record) {
+  return {
+    name: sanitizeName(record.name) || randomPlayerName(),
+    score: record.score | 0,
+    level: record.level | 0,
+    kills: record.kills | 0,
+    bosses: record.bosses | 0,
+    mode: record.mode || 'solo',
+    character: record.character || '',
+    result: record.result || 'gameover',
+    date: record.date || Date.now(),
+  };
+}
+
 export class Leaderboard {
-  static load() {
+  static loadLocal() {
     try {
       const data = JSON.parse(localStorage.getItem(RECORDS_KEY) || '[]');
       return Array.isArray(data) ? data : [];
@@ -50,37 +67,54 @@ export class Leaderboard {
     }
   }
 
-  static save(records) {
+  static saveLocal(records) {
     try {
       localStorage.setItem(RECORDS_KEY, JSON.stringify(records.slice(0, MAX_RECORDS)));
     } catch (_) {}
   }
 
-  static addRecord(record) {
-    const entry = {
-      name: sanitizeName(record.name) || randomPlayerName(),
-      score: record.score | 0,
-      level: record.level | 0,
-      kills: record.kills | 0,
-      bosses: record.bosses | 0,
-      mode: record.mode || 'solo',
-      character: record.character || '',
-      result: record.result || 'gameover',
-      date: Date.now(),
-    };
-    const records = this.load();
+  static mergeLocal(entry) {
+    const records = this.loadLocal();
     records.unshift(entry);
     records.sort((a, b) => b.score - a.score || b.level - a.level || b.kills - a.kills);
-    this.save(records);
+    this.saveLocal(records);
+  }
+
+  static async addRecord(record) {
+    const entry = normalizeEntry(record);
+    this.mergeLocal(entry);
+
+    if (isCloudLeaderboardEnabled()) {
+      try {
+        await submitCloudRecord(entry);
+      } catch (_) {
+        /* 離線時仍保留本機紀錄，下次開排行榜會再拉雲端 */
+      }
+    }
     return entry;
   }
 
-  static top(limit = 12) {
-    return this.load().slice(0, limit);
+  static async top(limit = 15) {
+    if (isCloudLeaderboardEnabled()) {
+      try {
+        const cloud = await fetchCloudRecords();
+        if (cloud?.length) return cloud.slice(0, limit);
+      } catch (_) {}
+    }
+    return this.loadLocal().slice(0, limit);
   }
 
-  static forPlayer(name, limit = 8) {
-    const target = sanitizeName(name);
-    return this.load().filter((r) => r.name === target).slice(0, limit);
+  static cloudEnabled() {
+    return isCloudLeaderboardEnabled();
+  }
+
+  static async getStatusMessage() {
+    if (!isCloudLeaderboardEnabled()) return '雲端排行榜未設定';
+    try {
+      await fetchCloudRecords();
+      return '🌐 全服公開 · 所有裝置同步';
+    } catch (_) {
+      return '⚠ 無法連線雲端 · 顯示本機紀錄';
+    }
   }
 }
