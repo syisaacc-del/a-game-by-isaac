@@ -1,7 +1,6 @@
 import { FIREBASE_DB_URL, isCloudLeaderboardEnabled } from './leaderboard-config.js';
 
-const CACHE_KEY = 'zs-cloud-leaderboard-cache';
-const CACHE_MS = 45_000;
+const DB_BASE = FIREBASE_DB_URL.replace(/\/+$/, '');const CACHE_MS = 45_000;
 
 function normalizeRecord(raw) {
   return {
@@ -45,7 +44,7 @@ export async function fetchCloudRecords() {
   const cached = readCache();
   if (cached) return cached;
 
-  const res = await fetch(`${FIREBASE_DB_URL}/leaderboard.json`, { cache: 'no-store' });
+  const res = await fetch(`${DB_BASE}/leaderboard.json`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`cloud fetch ${res.status}`);
   const data = await res.json();
   if (!data || typeof data !== 'object') return [];
@@ -59,7 +58,7 @@ export async function submitCloudRecord(record) {
   if (!isCloudLeaderboardEnabled()) return false;
 
   const entry = normalizeRecord({ ...record, date: record.date || Date.now() });
-  const res = await fetch(`${FIREBASE_DB_URL}/leaderboard.json`, {
+  const res = await fetch(`${DB_BASE}/leaderboard.json`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(entry),
