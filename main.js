@@ -7,6 +7,12 @@ import { Pickup, PICKUP_TYPES } from './pickup.js';
 import { CHARACTERS, getCharacter } from './characters.js';
 import { drawCharacterPreview } from './character-draw.js';
 import { MultiplayerManager } from './multiplayer.js';
+import {
+  Leaderboard,
+  formatBattleDate,
+  randomPlayerName,
+  resolvePlayerName,
+} from './player-profile.js';
 
 const EQUIP_NAMES = {
   dual: '雙發', spread: '散射', rapid: '速射', wheel: '風火輪', lightning: '雷電',
@@ -48,6 +54,15 @@ class Game {
     this.titleTextEl = document.getElementById('title-text');
     this.overlay = document.getElementById('overlay');
     this.overlayText = document.getElementById('overlay-text');
+    this.overlayStatsEl = document.getElementById('overlay-stats');
+    this.liveScoreboardEl = document.getElementById('live-scoreboard');
+    this.sbP1El = document.getElementById('sb-p1');
+    this.sbP2El = document.getElementById('sb-p2');
+    this.p1NameInput = document.getElementById('p1-name');
+    this.p2NameInput = document.getElementById('p2-name');
+    this.p2NameRow = document.getElementById('p2-name-row');
+    this.leaderboardModal = document.getElementById('leaderboard-modal');
+    this.leaderboardListEl = document.getElementById('leaderboard-list');
     this.levelModal = document.getElementById('level-modal');
     this.charModal = document.getElementById('char-modal');
     this.mpModal = document.getElementById('mp-modal');
@@ -67,6 +82,10 @@ class Game {
     this.ship2 = null;
     this.selectedCharId = 'hayato';
     this.selectedChar2Id = 'viktor';
+    this.playerName = '';
+    this.player2Name = '';
+    this.killCount = 0;
+    this.bossKills = 0;
     this.playMode = 'solo';
     this.onlineStarted = false;
     this.multiplayer = new MultiplayerManager(this);
@@ -162,6 +181,14 @@ class Game {
     document.getElementById('btn-online-host')?.addEventListener('click', () => this.beginOnlineHost());
     document.getElementById('btn-online-join')?.addEventListener('click', () => this.beginOnlineJoin());
     this.btnMpReadyEl?.addEventListener('click', () => this.setLobbyReady(true));
+    document.getElementById('btn-leaderboard')?.addEventListener('click', () => this.showLeaderboard());
+    document.getElementById('btn-leaderboard-close')?.addEventListener('click', () => this.hideLeaderboard());
+    document.getElementById('btn-random-p1')?.addEventListener('click', () => {
+      if (this.p1NameInput) this.p1NameInput.value = randomPlayerName();
+    });
+    document.getElementById('btn-random-p2')?.addEventListener('click', () => {
+      if (this.p2NameInput) this.p2NameInput.value = randomPlayerName();
+    });
   }
 
   bindMobileEvents() {
@@ -182,6 +209,14 @@ class Game {
     document.getElementById('btn-online-host')?.addEventListener('click', () => this.beginOnlineHost());
     document.getElementById('btn-online-join')?.addEventListener('click', () => this.beginOnlineJoin());
     this.btnMpReadyEl?.addEventListener('click', () => this.setLobbyReady(true));
+    document.getElementById('btn-leaderboard')?.addEventListener('click', () => this.showLeaderboard());
+    document.getElementById('btn-leaderboard-close')?.addEventListener('click', () => this.hideLeaderboard());
+    document.getElementById('btn-random-p1')?.addEventListener('click', () => {
+      if (this.p1NameInput) this.p1NameInput.value = randomPlayerName();
+    });
+    document.getElementById('btn-random-p2')?.addEventListener('click', () => {
+      if (this.p2NameInput) this.p2NameInput.value = randomPlayerName();
+    });
 
     const btnY = document.getElementById('btn-boss-y');
     const btnN = document.getElementById('btn-boss-n');
@@ -203,9 +238,11 @@ class Game {
     this.ship.setScreenSize(this.w, this.h);
   }
 
-  showOverlay(text) {
+  showOverlay(text, statsHtml = '') {
     this.overlayText.textContent = text;
+    if (this.overlayStatsEl) this.overlayStatsEl.innerHTML = statsHtml || '';
     this.overlay.classList.remove('hidden');
+    this.liveScoreboardEl?.classList.add('hidden');
     if (this.mobile && this.touch) this.touch.setVisible(false);
   }
 
@@ -234,9 +271,121 @@ class Game {
     this.hideOverlay();
     this.hideLevelModal();
     this.hideMpModal();
+    this.hideLeaderboard();
+    this.setP2NameVisible(false);
+    this.loadNameInputs();
     this.charModal?.classList.remove('hidden');
     this.highlightCharCard();
     if (this.mobile && this.touch) this.touch.setVisible(false);
+  }
+
+  loadNameInputs() {
+    try {
+      if (this.p1NameInput) this.p1NameInput.value = localStorage.getItem('zs-player-name-p1') || '';
+      if (this.p2NameInput) this.p2NameInput.value = localStorage.getItem('zs-player-name-p2') || '';
+    } catch (_) {}
+  }
+
+  setP2NameVisible(visible) {
+    this.p2NameRow?.classList.toggle('hidden', !visible);
+  }
+
+  resolveNames() {
+    if (this.playMode === 'online' && !this.multiplayer.isHost) {
+      this.player2Name = resolvePlayerName(this.p1NameInput?.value, 1);
+      if (this.p1NameInput) this.p1NameInput.value = this.player2Name;
+      this.playerName = this.multiplayer.hostPlayerName || '房主';
+      return;
+    }
+
+    this.playerName = resolvePlayerName(this.p1NameInput?.value, 1);
+    if (this.p1NameInput) this.p1NameInput.value = this.playerName;
+    if (this.playMode === 'local') {
+      this.player2Name = resolvePlayerName(this.p2NameInput?.value, 2);
+      if (this.p2NameInput) this.p2NameInput.value = this.player2Name;
+    } else if (this.playMode === 'online' && this.multiplayer.isHost) {
+      this.player2Name = this.multiplayer.remotePlayerName || randomPlayerName();
+    } else {
+      this.player2Name = '';
+    }
+  }
+
+  showLeaderboard() {
+    this.renderLeaderboard();
+    this.leaderboardModal?.classList.remove('hidden');
+  }
+
+  hideLeaderboard() {
+    this.leaderboardModal?.classList.add('hidden');
+  }
+
+  renderLeaderboard() {
+    if (!this.leaderboardListEl) return;
+    const rows = Leaderboard.top(15);
+    if (rows.length === 0) {
+      this.leaderboardListEl.innerHTML = '<p class="lb-meta" style="text-align:center;padding:20px">暫無紀錄，打一局先！</p>';
+      return;
+    }
+    const head = '<div class="lb-row head"><span>#</span><span>玩家</span><span>得分</span></div>';
+    const body = rows.map((r, i) => {
+      const modeLabel = { solo: '單人', local: '本地', online: '線上' }[r.mode] || r.mode;
+      return `<div class="lb-row">
+        <span class="lb-rank">${i + 1}</span>
+        <span><span class="lb-name">${r.name}</span>
+          <div class="lb-meta">L${r.level} · 擊殺${r.kills} · Boss${r.bosses} · ${modeLabel} · ${formatBattleDate(r.date)}</div>
+        </span>
+        <span class="lb-score">${r.score}</span>
+      </div>`;
+    }).join('');
+    this.leaderboardListEl.innerHTML = head + body;
+  }
+
+  buildBattleRecord(name, result) {
+    return {
+      name,
+      score: this.score,
+      level: this.level,
+      kills: this.killCount,
+      bosses: this.bossKills,
+      mode: this.playMode,
+      character: name === this.player2Name ? this.selectedChar2Id : this.selectedCharId,
+      result,
+    };
+  }
+
+  saveBattleRecord(name, result = 'gameover') {
+    if (!name) return;
+    Leaderboard.addRecord(this.buildBattleRecord(name, result));
+  }
+
+  formatStatsHtml(name, result) {
+    const resultText = result === 'out' ? '已出局' : 'GAME OVER';
+    return `${name}<br>得分 ${this.score} · Lv.${this.level}<br>擊殺 ${this.killCount} · Boss ${this.bossKills}<br><span style="color:#888">${resultText}</span>`;
+  }
+
+  endPlayerSession(ship, result = 'out') {
+    const name = ship.playerIndex === 1 ? this.player2Name : this.playerName;
+    this.saveBattleRecord(name, result);
+    return this.formatStatsHtml(name, result);
+  }
+
+  updateLiveScoreboard() {
+    if (!this.liveScoreboardEl || this.state !== 'playing') {
+      this.liveScoreboardEl?.classList.add('hidden');
+      return;
+    }
+    this.liveScoreboardEl.classList.remove('hidden');
+    if (this.sbP1El) {
+      const out = this.ship.eliminated ? ' (出局)' : '';
+      this.sbP1El.innerHTML = `<span class="sb-name">${this.playerName}${out}</span><br>★${this.score} · 殺${this.killCount}`;
+    }
+    if (this.sbP2El && this.ship2 && this.player2Name) {
+      this.sbP2El.classList.remove('hidden');
+      const out = this.ship2.eliminated ? ' (出局)' : '';
+      this.sbP2El.innerHTML = `<span class="sb-name">${this.player2Name}${out}</span><br>★${this.score} · 殺${this.killCount}`;
+    } else {
+      this.sbP2El?.classList.add('hidden');
+    }
   }
 
   hideMpModal() {
@@ -270,6 +419,7 @@ class Game {
     const def = getCharacter(this.selectedCharId);
     this.ship.applyCharacter(def);
     this.ship.playerIndex = 0;
+    this.ship.displayName = this.playerName;
 
     if (this.playMode === 'local' || this.playMode === 'online') {
       if (!this.ship2) this.ship2 = new Ship();
@@ -279,12 +429,14 @@ class Game {
       const def2 = getCharacter(p2Id);
       this.ship2.applyCharacter(def2);
       this.ship2.playerIndex = 1;
+      this.ship2.displayName = this.player2Name || 'P2';
       this.ship2.setScreenSize(this.w, this.h);
 
       if (this.playMode === 'online' && !this.multiplayer.isHost) {
         const hostDef = getCharacter(this.multiplayer.hostCharId);
         this.ship.applyCharacter(hostDef);
         this.ship.playerIndex = 0;
+        this.ship.displayName = this.multiplayer.hostPlayerName || 'P1';
       }
     } else {
       this.ship2 = null;
@@ -294,6 +446,8 @@ class Game {
   beginSolo() {
     this.playMode = 'solo';
     this.multiplayer.setMode('solo');
+    this.setP2NameVisible(false);
+    this.resolveNames();
     this.hideCharSelect();
     this.startGame();
   }
@@ -301,6 +455,8 @@ class Game {
   beginLocal() {
     this.playMode = 'local';
     this.multiplayer.setMode('local');
+    this.setP2NameVisible(true);
+    this.resolveNames();
     const ids = CHARACTERS.map((c) => c.id).filter((id) => id !== this.selectedCharId);
     this.selectedChar2Id = ids[Math.floor(Math.random() * ids.length)] || 'viktor';
     this.hideCharSelect();
@@ -310,6 +466,8 @@ class Game {
   async beginOnlineHost() {
     try {
       this.playMode = 'online';
+      this.setP2NameVisible(false);
+      this.resolveNames();
       this.multiplayer.setMode('online');
       const code = await this.multiplayer.hostOnline();
       if (this.roomCodeEl) this.roomCodeEl.textContent = code;
@@ -330,6 +488,8 @@ class Game {
     }
     try {
       this.playMode = 'online';
+      this.setP2NameVisible(false);
+      this.resolveNames();
       this.multiplayer.setMode('online');
       await this.multiplayer.joinOnline(code);
       this.state = 'onlineLobby';
@@ -364,7 +524,7 @@ class Game {
     }
 
     if (this.mpReadyHintEl) {
-      const role = host ? '你是 P1（房主）' : '你是 P2（隊友）';
+      const role = host ? `房主 ${this.playerName}` : `隊友 ${this.player2Name || this.playerName}`;
       const need = !localReady
         ? '請按下方「準備」'
         : (!remoteReady ? '已準備，等對方按準備…' : '即將開始…');
@@ -390,20 +550,26 @@ class Game {
 
   tryStartMatch() {
     if (!this.multiplayer.canStart() || this.onlineStarted) return;
+    this.player2Name = this.multiplayer.remotePlayerName || randomPlayerName();
     this.multiplayer.sendStart({
       hostCharId: this.selectedCharId,
       guestCharId: this.multiplayer.remoteCharId,
+      hostName: this.playerName,
+      guestName: this.player2Name,
     });
     this.startOnlineGame({
       hostCharId: this.selectedCharId,
       guestCharId: this.multiplayer.remoteCharId,
+      hostName: this.playerName,
+      guestName: this.player2Name,
     });
   }
 
   setLobbyReady(ready) {
     if (this.state !== 'onlineLobby' || this.multiplayer.localReady) return;
+    this.resolveNames();
     this.multiplayer.setLocalReady(ready);
-    this.multiplayer.sendReady(this.selectedCharId);
+    this.multiplayer.sendReady(this.selectedCharId, this.playerName);
     this.updateLobbyUI();
     if (this.multiplayer.isHost) this.tryStartMatch();
   }
@@ -416,10 +582,13 @@ class Game {
       this.multiplayer.remoteCharId = data.guestCharId;
       this.selectedChar2Id = data.guestCharId;
     }
+    if (data.hostName) this.multiplayer.hostPlayerName = data.hostName;
+    if (data.guestName) this.multiplayer.remotePlayerName = data.guestName;
+    this.resolveNames();
     this.hideMpModal();
     if (this.mobile && this.touch) this.touch.setVisible(true);
     this.startGame();
-    const role = this.multiplayer.isHost ? 'P1 房主' : 'P2 隊友';
+    const role = this.multiplayer.isHost ? this.playerName : this.player2Name;
     this.showPickupMsg(`對戰開始 · ${role}`);
   }
 
@@ -430,6 +599,15 @@ class Game {
     this.level = data.level ?? this.level;
     this.lives = data.lives ?? this.lives;
     this.lives2 = data.lives2 ?? this.lives2;
+    this.killCount = data.kills ?? this.killCount;
+    if (data.hostName) {
+      this.multiplayer.hostPlayerName = data.hostName;
+      this.ship.displayName = data.hostName;
+    }
+    if (data.guestName) {
+      this.player2Name = data.guestName;
+      if (this.ship2) this.ship2.displayName = data.guestName;
+    }
 
     if (data.p1) {
       this.ship.pos.x = data.p1.x;
@@ -447,14 +625,19 @@ class Game {
     }
 
     if (!this.multiplayer.isHost && this.ship2?.eliminated) {
+      if (!this.guestRecordSaved) {
+        this.guestRecordSaved = true;
+        this.saveBattleRecord(this.player2Name, 'out');
+      }
       this.state = 'gameover';
-      this.showOverlay('GAME OVER');
+      this.showOverlay('GAME OVER', this.formatStatsHtml(this.player2Name, 'out'));
       if (this.mobile && this.touch) this.touch.setVisible(false);
     }
 
     if (data.asteroids) this.syncAsteroidsFromNetwork(data.asteroids);
     if (data.bullets) this.syncBulletsFromNetwork(data.bullets);
     this.updateHud();
+    this.updateLiveScoreboard();
   }
 
   syncAsteroidsFromNetwork(list) {
@@ -547,6 +730,9 @@ class Game {
     this.score = 0;
     this.lives = 3;
     this.lives2 = 3;
+    this.killCount = 0;
+    this.bossKills = 0;
+    this.guestRecordSaved = false;
     this.level = 1;
     this.speedBoost = 0;
     this.state = 'playing';
@@ -579,8 +765,9 @@ class Game {
     this.updateHud();
     this.hideOverlay();
     this.requestMobileFullscreen();
+    this.updateLiveScoreboard();
     const c = getCharacter(this.selectedCharId);
-    this.showPickupMsg(`${c.flag} ${c.name} · 天賦【${c.talent}】`);
+    this.showPickupMsg(`${this.playerName} · ${c.flag} ${c.name}`);
   }
 
   clearEntities() {
@@ -732,6 +919,8 @@ class Game {
     } else {
       this.equipEl.classList.add('hidden');
     }
+
+    this.updateLiveScoreboard();
   }
 
   onWaveClear() {
@@ -1077,31 +1266,45 @@ class Game {
     this.updateHud();
 
     const livesLeft = isP2 ? this.lives2 : this.lives;
-    const label = isP2 ? 'P2' : 'P1';
+    const label = isP2 ? this.player2Name : this.playerName;
 
     if (livesLeft <= 0) {
       ship.eliminated = true;
       ship.kill();
+      const statsHtml = this.endPlayerSession(ship, 'out');
       this.showPickupMsg(`${label} 已出局`);
 
-      if (this.playMode === 'online' && !this.multiplayer.isHost && isP2) {
+      if (this.allPlayersEliminated()) {
         this.state = 'gameover';
-        this.showOverlay('GAME OVER');
+        this.showOverlay('GAME OVER', this.buildFinalStatsHtml());
         if (this.mobile && this.touch) this.touch.setVisible(false);
+      } else if (this.playMode === 'online' && !this.multiplayer.isHost && isP2) {
+        this.state = 'gameover';
+        this.showOverlay('GAME OVER', statsHtml);
+        if (this.mobile && this.touch) this.touch.setVisible(false);
+      } else {
+        this.showPickupMsg(`${label} 已退場 · 另一玩家繼續`);
       }
     } else {
       ship.kill();
     }
 
-    if (this.allPlayersEliminated()) {
-      this.state = 'gameover';
-      this.showOverlay('GAME OVER');
-      if (this.mobile && this.touch) this.touch.setVisible(false);
+    this.updateLiveScoreboard();
+  }
+
+  buildFinalStatsHtml() {
+    const parts = [];
+    if (this.playerName) parts.push(this.formatStatsHtml(this.playerName, 'gameover'));
+    if (this.player2Name && this.ship2) {
+      parts.push(this.formatStatsHtml(this.player2Name, this.ship2.eliminated ? 'out' : 'gameover'));
     }
+    return parts.join('<hr style="border-color:#333;margin:8px 0">');
   }
 
   killZombie(a, allowSplit) {
     this.score += a.score;
+    this.killCount++;
+    if (a.isBoss) this.bossKills++;
     burst(this.particlePool, this.particles, a.pos.x, a.pos.y, 16, a.isBoss ? '#ff4444' : '#7ecf8e', 1, 6, 1, a.radius / 4);
 
     if (a.isBoss) {
@@ -1235,8 +1438,8 @@ class Game {
     };
 
     if (this.ship2) {
-      if (!this.ship.eliminated) drawBar(this.ship, 16, 'P1');
-      if (!this.ship2.eliminated) drawBar(this.ship2, this.w - barW - 16, 'P2');
+    if (!this.ship.eliminated) drawBar(this.ship, 16, this.playerName || 'P1');
+      if (!this.ship2.eliminated) drawBar(this.ship2, this.w - barW - 16, this.player2Name || 'P2');
     } else if (!this.ship.eliminated) {
       drawBar(this.ship, (this.w - barW) / 2, 'HP');
     }
