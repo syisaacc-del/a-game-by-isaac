@@ -216,6 +216,24 @@ export class Ship {
     else if (this.pos.y < 0) this.pos.y = h;
   }
 
+  clampToArena(w, h) {
+    const r = this.radius;
+    if (this.pos.x < r) {
+      this.pos.x = r;
+      if (this.vel.x < 0) this.vel.x = 0;
+    } else if (this.pos.x > w - r) {
+      this.pos.x = w - r;
+      if (this.vel.x > 0) this.vel.x = 0;
+    }
+    if (this.pos.y < r) {
+      this.pos.y = r;
+      if (this.vel.y < 0) this.vel.y = 0;
+    } else if (this.pos.y > h - r) {
+      this.pos.y = h - r;
+      if (this.vel.y > 0) this.vel.y = 0;
+    }
+  }
+
   drawSingleWheel(ctx, x, y, spin) {
     const r = this.wheelRadius * 0.85;
     ctx.save();
