@@ -10,12 +10,28 @@ html, body {
   background: #0a0a0a;
 }
 
-canvas {
+#game-view {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+#game3d-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 0;
+}
+
+canvas#canvas {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  background: #262626;
+  background: transparent;
+  z-index: 1;
+  pointer-events: none;
 }
 
 #info {
