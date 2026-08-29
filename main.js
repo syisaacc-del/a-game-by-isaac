@@ -13,6 +13,7 @@ import {
   randomPlayerName,
   resolvePlayerName,
 } from './player-profile.js';
+import { Renderer3D } from './renderer3d.js';
 
 const EQUIP_NAMES = {
   dual: '雙發', spread: '散射', rapid: '速射', wheel: '風火輪', lightning: '雷電',
@@ -46,6 +47,8 @@ class Game {
 
     this.canvas = document.getElementById('canvas');
     this.ctx = this.canvas.getContext('2d');
+    this.gameView = document.getElementById('game-view');
+    this.renderer3d = new Renderer3D(this.gameView || document.body, { mobile: this.mobile });
     this.scoreEl = document.getElementById('score');
     this.livesEl = document.getElementById('lives');
     this.levelEl = document.getElementById('level');
@@ -236,6 +239,7 @@ class Game {
     this.canvas.height = this.h;
     this.scanLines = this.mobile ? (this.h / 8) | 0 : (this.h / 4) | 0;
     this.ship.setScreenSize(this.w, this.h);
+    this.renderer3d?.resize(this.w, this.h);
   }
 
   showOverlay(text, statsHtml = '') {
@@ -1568,23 +1572,29 @@ class Game {
 
   render() {
     const { ctx } = this;
-    ctx.fillStyle = '#262626';
-    ctx.globalAlpha = 0.35;
-    ctx.fillRect(0, 0, this.w, this.h);
-    ctx.globalAlpha = 1;
+    ctx.clearRect(0, 0, this.w, this.h);
+
+    const use3d = this.state !== 'charSelect' && this.state !== 'onlineLobby';
+    this.renderer3d?.setVisible(use3d);
 
     if (this.state === 'charSelect' || this.state === 'onlineLobby') {
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fillRect(0, 0, this.w, this.h);
       this.renderScanlines();
       return;
     }
 
-    for (const pk of this.pickups) pk.draw(ctx);
-    for (const a of this.asteroids) a.draw(ctx);
-    for (const b of this.bullets) b.draw(ctx);
-    for (const arc of this.lightningArcs) this.drawLightningArc(ctx, arc);
-    for (const p of this.particles) p.draw(ctx);
-    if (!this.ship.eliminated) this.ship.draw(ctx);
-    if (this.ship2 && !this.ship2.eliminated) this.ship2.draw(ctx);
+    if (use3d) {
+      this.renderer3d.sync(this);
+    } else {
+      for (const pk of this.pickups) pk.draw(ctx);
+      for (const a of this.asteroids) a.draw(ctx);
+      for (const b of this.bullets) b.draw(ctx);
+      for (const arc of this.lightningArcs) this.drawLightningArc(ctx, arc);
+      for (const p of this.particles) p.draw(ctx);
+      if (!this.ship.eliminated) this.ship.draw(ctx);
+      if (this.ship2 && !this.ship2.eliminated) this.ship2.draw(ctx);
+    }
 
     if (this.screenFlash > 0) {
       ctx.fillStyle = `rgba(80,240,255,${this.screenFlash / 28})`;
@@ -1593,7 +1603,7 @@ class Game {
 
     this.renderTitleFx(ctx);
 
-    if (this.dragonflyWave) {
+    if (!use3d && this.dragonflyWave) {
       const w = this.dragonflyWave;
       const alpha = w.life / 22;
       const r = w.r;
@@ -1602,15 +1612,6 @@ class Game {
       ctx.beginPath();
       ctx.arc(w.x, w.y, r, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.strokeStyle = `rgba(200,255,255,${alpha * 0.55})`;
-      ctx.lineWidth = 2;
-      for (let i = 0; i < 6; i++) {
-        const ang = (Math.PI * 2 * i) / 6 + (22 - w.life) * 0.12;
-        ctx.beginPath();
-        ctx.moveTo(w.x, w.y);
-        ctx.lineTo(w.x + Math.cos(ang) * r, w.y + Math.sin(ang) * r);
-        ctx.stroke();
-      }
     }
 
     if (this.state === 'playing' || this.state === 'levelPrompt') {
