@@ -13,7 +13,7 @@ export const CHARACTERS = [
     shootCdMul: 1,
     colors: {
       skin: '#f5d0b0', body: '#1a1a2e', bodyLight: '#2d2d44',
-      accent: '#e63946', hair: '#1a1a1a', gun: '#444', trim: '#ff4757',
+      accent: '#dde0ee', hair: '#dde0ee', gun: '#444', trim: '#ff4757',
     },
   },
   {
@@ -29,8 +29,8 @@ export const CHARACTERS = [
     extraChain: 0,
     shootCdMul: 1,
     colors: {
-      skin: '#e8c4a8', body: '#3d4f5f', bodyLight: '#5a6f7f',
-      accent: '#90a4ae', hair: '#4a3728', gun: '#555', trim: '#cfd8dc',
+      skin: '#e8c4a8', body: '#4a5058', bodyLight: '#6a7078',
+      accent: '#ffcc44', hair: '#4a3728', gun: '#555', trim: '#cfd8dc',
     },
   },
   {
@@ -46,8 +46,8 @@ export const CHARACTERS = [
     extraChain: 1,
     shootCdMul: 0.9,
     colors: {
-      skin: '#c68642', body: '#b8860b', bodyLight: '#daa520',
-      accent: '#00e5ff', hair: '#111', gun: '#333', trim: '#ffd700',
+      skin: '#c68642', body: '#142040', bodyLight: '#1e3070',
+      accent: '#daa520', hair: '#111', gun: '#333', trim: '#ffd700',
     },
   },
 ];
