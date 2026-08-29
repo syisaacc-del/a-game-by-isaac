@@ -1139,10 +1139,10 @@ class Game {
 
     this.input();
     this.ship.update();
-    if (!this.ship.dead) this.ship.wrap(this.w, this.h);
+    if (!this.ship.dead) this.ship.clampToArena(this.w, this.h);
     if (this.ship2) {
       this.ship2.update();
-      if (!this.ship2.dead) this.ship2.wrap(this.w, this.h);
+      if (!this.ship2.dead) this.ship2.clampToArena(this.w, this.h);
     }
     this.multiplayer.update();
 
@@ -1586,6 +1586,7 @@ class Game {
 
     if (use3d) {
       this.renderer3d.sync(this);
+      this.render3dFxOverlay(ctx);
     } else {
       for (const pk of this.pickups) pk.draw(ctx);
       for (const a of this.asteroids) a.draw(ctx);
@@ -1620,6 +1621,66 @@ class Game {
     }
 
     this.renderScanlines();
+  }
+
+  render3dFxOverlay(ctx) {
+    const project = (x, y, h = 0) => this.renderer3d.projectToScreen(x, y, h);
+
+    for (const a of this.asteroids) {
+      if (!a.active) continue;
+      if (a.lightningFlash > 0) {
+        const p = project(a.pos.x, a.pos.y, 5);
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.strokeStyle = `rgba(170,230,255,${a.lightningFlash / 20})`;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(0, 0, a.radius + 6, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+      if (a.isBoss) {
+        const p = project(a.pos.x, a.pos.y, 14);
+        const r = a.radius;
+        const bw = r * 1.8;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.fillStyle = '#220000';
+        ctx.fillRect(-bw / 2, -r - 22, bw, 8);
+        ctx.fillStyle = '#ff2200';
+        ctx.fillRect(-bw / 2, -r - 22, bw * (a.bossHp / a.maxBossHp), 8);
+        ctx.fillStyle = '#ffcc00';
+        ctx.font = `bold ${Math.max(11, r * 0.14)}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('☠ BOSS ☠', 0, -r - 28);
+        if (a.attackFlash > 0) {
+          const alpha = a.attackFlash / 25;
+          ctx.strokeStyle = `rgba(255,50,50,${alpha})`;
+          ctx.lineWidth = 5 + (25 - a.attackFlash) * 0.5;
+          ctx.beginPath();
+          ctx.arc(0, 0, r + 10 + (25 - a.attackFlash) * 4, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
+
+    if (this.dragonflyWave) {
+      const w = this.dragonflyWave;
+      const alpha = w.life / 22;
+      const r = w.r;
+      const p = project(w.x, w.y, 1);
+      ctx.strokeStyle = `rgba(0,220,255,${alpha * 0.85})`;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(180,255,255,${alpha * 0.35})`;
+      ctx.lineWidth = 12;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * 0.92, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 
   renderScanlines() {
