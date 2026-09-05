@@ -200,7 +200,7 @@ export class MultiplayerManager {
     if (this.syncTimer % 3 !== 0) return;
     const g = this.game;
     this.sendState({
-      asteroids: g.asteroids.filter((a) => a.active).slice(0, 40).map((a) => ({
+      asteroids: g.asteroids.filter((a) => a.active).slice(0, 60).map((a) => ({
         x: a.pos.x,
         y: a.pos.y,
         type: a.type,
