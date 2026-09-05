@@ -22,7 +22,8 @@ export class Asteroid {
     this.next = def.next;
     this.scale = def.scale;
     this.pos = new Vec2(x, y);
-    this.vel = Vec2.fromAngle(Math.random() * Math.PI * 2, def.speed + speedBoost);
+    this.chaseSpeed = def.speed + speedBoost;
+    this.vel = Vec2.fromAngle(Math.random() * Math.PI * 2, this.chaseSpeed);
     this.angle = Math.random() * Math.PI * 2;
     this.spin = (Math.random() - 0.5) * 0.025;
     this.lurch = Math.random() * Math.PI * 2;
@@ -88,16 +89,36 @@ export class Asteroid {
     this.active = false;
   }
 
+  updateChase(playerX, playerY) {
+    const dx = playerX - this.pos.x;
+    const dy = playerY - this.pos.y;
+    const dist = Math.hypot(dx, dy);
+    const speed = this.chaseSpeed || 1;
+
+    if (dist > 4) {
+      this.vel.set((dx / dist) * speed, (dy / dist) * speed);
+      this.angle = Math.atan2(dy, dx);
+    } else {
+      this.vel.set(0, 0);
+    }
+    this.lurch += 0.07;
+    if (this.lightningFlash > 0) this.lightningFlash--;
+  }
+
   update(playerX, playerY) {
     if (this.isBoss && playerX != null) {
       const attacked = this.updateBoss(playerX, playerY);
       this.pos.add(this.vel);
       return attacked;
     }
+    if (playerX != null) {
+      this.updateChase(playerX, playerY);
+    } else {
+      this.angle += this.spin;
+      this.lurch += 0.07;
+      if (this.lightningFlash > 0) this.lightningFlash--;
+    }
     this.pos.add(this.vel);
-    this.angle += this.spin;
-    this.lurch += 0.07;
-    if (this.lightningFlash > 0) this.lightningFlash--;
     return false;
   }
 
