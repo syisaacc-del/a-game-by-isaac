@@ -20,6 +20,7 @@ const EQUIP_NAMES = {
 };
 const EQUIP_KEYS = ['dual', 'spread', 'rapid', 'wheel', 'lightning'];
 const DRAGONFLY_CD = 3000;
+const MAP_SCALE = 2.2;
 const CHAIN_RANGE = 120;
 const CHAIN_MAX = 3;
 const MAX_ARCS = 12;
@@ -78,6 +79,8 @@ class Game {
     this.keys = {};
     this.w = 0;
     this.h = 0;
+    this.worldW = 0;
+    this.worldH = 0;
     this.scanLines = 0;
     this.charPreviewT = 0;
 
@@ -95,7 +98,7 @@ class Game {
     this.lives2 = 3;
     const particleCount = this.mobile ? 180 : 300;
     this.bulletPool = new Pool(() => new Bullet(), 120);
-    this.asteroidPool = new Pool(() => new Asteroid(), 50);
+    this.asteroidPool = new Pool(() => new Asteroid(), 80);
     this.particlePool = new Pool(() => new Particle(), particleCount);
     this.pickupPool = new Pool(() => new Pickup(), 25);
 
@@ -237,9 +240,27 @@ class Game {
     this.h = this.canvas.clientHeight;
     this.canvas.width = this.w;
     this.canvas.height = this.h;
+    this.worldW = Math.round(this.w * MAP_SCALE);
+    this.worldH = Math.round(this.h * MAP_SCALE);
     this.scanLines = this.mobile ? (this.h / 8) | 0 : (this.h / 4) | 0;
-    this.ship.setScreenSize(this.w, this.h);
-    this.renderer3d?.resize(this.w, this.h);
+    this.ship.setScreenSize(this.worldW, this.worldH);
+    if (this.ship2) this.ship2.setScreenSize(this.worldW, this.worldH);
+    this.renderer3d?.resize(this.w, this.h, this.worldW, this.worldH);
+  }
+
+  /** 雙人 / 線上俯視鏡頭用；單人第三人稱鏡頭在 renderer3d.js */
+  getCameraFocus() {
+    const players = this.getPlayers().filter((p) => !p.dead && !p.eliminated);
+    if (players.length === 0) {
+      return { x: this.worldW / 2, y: this.worldH / 2 };
+    }
+    if (players.length === 1) {
+      return { x: players[0].pos.x, y: players[0].pos.y };
+    }
+    return {
+      x: (players[0].pos.x + players[1].pos.x) / 2,
+      y: (players[0].pos.y + players[1].pos.y) / 2,
+    };
   }
 
   showOverlay(text, statsHtml = '') {
@@ -447,7 +468,7 @@ class Game {
       this.ship2.applyCharacter(def2);
       this.ship2.playerIndex = 1;
       this.ship2.displayName = this.player2Name || 'P2';
-      this.ship2.setScreenSize(this.w, this.h);
+      this.ship2.setScreenSize(this.worldW, this.worldH);
 
       if (this.playMode === 'online' && !this.multiplayer.isHost) {
         const hostDef = getCharacter(this.multiplayer.hostCharId);
@@ -770,13 +791,16 @@ class Game {
     this.hideLevelModal();
     this.clearEntities();
     this.setupShips();
-    this.ship.reset(this.w / 2 - (this.ship2 ? 50 : 0), this.h / 2);
+    this.ship.reset(this.worldW / 2 - (this.ship2 ? 50 : 0), this.worldH / 2);
     this.ship.hp = this.ship.maxHp;
     this.ship.invincible = 120;
     if (this.ship2) {
-      this.ship2.reset(this.w / 2 + 50, this.h / 2);
+      this.ship2.reset(this.worldW / 2 + 50, this.worldH / 2);
       this.ship2.hp = this.ship2.maxHp;
       this.ship2.invincible = 120;
+    }
+    if (this.playMode === 'solo') {
+      this.renderer3d?.resetFollowCamera(this.ship);
     }
     this.spawnLevel();
     this.updateHud();
@@ -799,14 +823,15 @@ class Game {
   }
 
   zombieCountForLevel() {
-    return Math.min(20, 3 + Math.floor(this.level * 1.6));
+    const base = 3 + Math.floor(this.level * 1.6);
+    return Math.min(30, Math.round(base * 1.5));
   }
 
   randomPos(minDist = 100) {
     let x, y, tries = 0;
     do {
-      x = 80 + Math.random() * (this.w - 160);
-      y = 80 + Math.random() * (this.h - 160);
+      x = 80 + Math.random() * (this.worldW - 160);
+      y = 80 + Math.random() * (this.worldH - 160);
       tries++;
     } while (Math.hypot(x - this.ship.pos.x, y - this.ship.pos.y) < minDist && tries < 30);
     return { x, y };
@@ -871,7 +896,7 @@ class Game {
 
     const a = this.asteroidPool.acquire();
     if (!a) return;
-    a.spawnBoss(this.w / 2, this.h / 2 - 50, this.level);
+    a.spawnBoss(this.worldW / 2, this.worldH / 2 - 50, this.level);
     this.asteroids.push(a);
     this.bossActive = true;
     this.bossFight = true;
@@ -895,8 +920,8 @@ class Game {
     this.titleFlash = 55;
     this.showPickupMsg(`★ 稱號覺醒：${name} ★`);
     this.pickupMsgTimer = 200;
-    burst(this.particlePool, this.particles, this.w / 2, 48, 22, '#ffd700', 3, 14, 2, 10);
-    burst(this.particlePool, this.particles, this.w / 2, 48, 14, '#ff8800', 2, 10, 1, 8);
+    burst(this.particlePool, this.particles, this.ship.pos.x, this.ship.pos.y, 22, '#ffd700', 3, 14, 2, 10);
+    burst(this.particlePool, this.particles, this.ship.pos.x, this.ship.pos.y, 14, '#ff8800', 2, 10, 1, 8);
     burst(this.particlePool, this.particles, this.ship.pos.x, this.ship.pos.y, 16, '#ffee88', 2, 8, 1, 6);
     this.updateHud();
   }
@@ -987,7 +1012,7 @@ class Game {
       return;
     }
 
-    const maxR = Math.max(this.w, this.h) * 0.85;
+    const maxR = Math.max(this.worldW, this.worldH) * 0.85;
     this.dragonflyWave = { r: 0, maxR, life: 22, x: this.ship.pos.x, y: this.ship.pos.y };
     this.screenFlash = 28;
 
@@ -1093,7 +1118,12 @@ class Game {
       shooting = touch?.shooting || false;
     }
 
-    ship.move(dx, dy);
+    const solo = this.playMode === 'solo' && ship === this.ship;
+    if (solo) {
+      ship.moveThirdPerson(dx, dy);
+    } else {
+      ship.move(dx, dy);
+    }
     if (dx !== 0 || dy !== 0) this.emitFootsteps(ship);
 
     if (shooting && ship.canShoot()) {
@@ -1139,10 +1169,10 @@ class Game {
 
     this.input();
     this.ship.update();
-    if (!this.ship.dead) this.ship.clampToArena(this.w, this.h);
+    if (!this.ship.dead) this.ship.clampToArena(this.worldW, this.worldH);
     if (this.ship2) {
       this.ship2.update();
-      if (!this.ship2.dead) this.ship2.clampToArena(this.w, this.h);
+      if (!this.ship2.dead) this.ship2.clampToArena(this.worldW, this.worldH);
     }
     this.multiplayer.update();
 
@@ -1160,7 +1190,7 @@ class Game {
         }
       }
       if (a.wheelHitCd > 0) a.wheelHitCd--;
-      if (!a.isBoss) a.wrap(this.w, this.h);
+      if (!a.isBoss) a.wrap(this.worldW, this.worldH);
     }
     for (const p of this.particles) p.update();
     for (const pk of this.pickups) pk.update();
@@ -1347,7 +1377,7 @@ class Game {
   checkBulletHits() {
     for (const b of this.bullets) {
       if (!b.active) continue;
-      if (b.pos.x < 0 || b.pos.x > this.w || b.pos.y < 0 || b.pos.y > this.h) {
+      if (b.pos.x < 0 || b.pos.x > this.worldW || b.pos.y < 0 || b.pos.y > this.worldH) {
         b.active = false;
         continue;
       }
@@ -1588,6 +1618,9 @@ class Game {
       this.renderer3d.sync(this);
       this.render3dFxOverlay(ctx);
     } else {
+      const focus = this.getCameraFocus();
+      ctx.save();
+      ctx.translate(this.w / 2 - focus.x, this.h / 2 - focus.y);
       for (const pk of this.pickups) pk.draw(ctx);
       for (const a of this.asteroids) a.draw(ctx);
       for (const b of this.bullets) b.draw(ctx);
@@ -1595,6 +1628,7 @@ class Game {
       for (const p of this.particles) p.draw(ctx);
       if (!this.ship.eliminated) this.ship.draw(ctx);
       if (this.ship2 && !this.ship2.eliminated) this.ship2.draw(ctx);
+      ctx.restore();
     }
 
     if (this.screenFlash > 0) {
