@@ -270,13 +270,25 @@ export class Renderer3D {
     this.mobile = mobile;
     this.w = 800;
     this.h = 600;
+    this.worldW = 800;
+    this.worldH = 600;
+    this.camFocusX = 400;
+    this.camFocusY = 300;
+    this.soloCameraReady = false;
+    this._camYaw = 0;
     this.t = 0;
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x141418);
-    this.scene.fog = new THREE.Fog(0x141418, 700, 2800);
+    this.scene.fog = new THREE.Fog(0x141418, 500, 4200);
 
-    this.camera = new THREE.PerspectiveCamera(54, 1, 2, 3500);
+    this.camera = new THREE.PerspectiveCamera(62, 1, 2, 3500);
+    this.cameraRig = new THREE.Object3D();
+    this.scene.add(this.cameraRig);
+    this._targetCamPos = new THREE.Vector3();
+    this._targetLookPos = new THREE.Vector3();
+    this._smoothCamPos = new THREE.Vector3(0, 200, 200);
+    this._smoothLookPos = new THREE.Vector3();
 
     this.renderer = new THREE.WebGLRenderer({
       antialias: !mobile,
@@ -361,7 +373,7 @@ export class Renderer3D {
     floor.receiveShadow = true;
     this.arena.add(floor);
 
-    const grid = new THREE.GridHelper(Math.max(w, h), this.mobile ? 16 : 24, 0x555577, 0x333348);
+    const grid = new THREE.GridHelper(Math.max(w, h), this.mobile ? 22 : 34, 0x555577, 0x333348);
     grid.position.y = 0.12;
     this.arena.add(grid);
 
@@ -400,30 +412,115 @@ export class Renderer3D {
     }
   }
 
-  resize(w, h) {
-    this.w = w;
-    this.h = h;
-    this.renderer.setSize(w, h, false);
-    this.camera.aspect = w / h;
+  resize(viewW, viewH, worldW, worldH) {
+    this.w = viewW;
+    this.h = viewH;
+    this.worldW = worldW || viewW;
+    this.worldH = worldH || viewH;
+    this.renderer.setSize(viewW, viewH, false);
+    this.camera.aspect = viewW / viewH;
     this.camera.updateProjectionMatrix();
-    this.rebuildFloor(w, h);
-    this.updateCamera();
+    this.rebuildFloor(this.worldW, this.worldH);
   }
 
-  updateCamera() {
-    const w = this.w;
-    const h = this.h;
-    const maxDim = Math.max(w, h);
-    const minDim = Math.min(w, h);
+  resetFollowCamera(ship) {
+    if (!ship) return;
+    this.soloCameraReady = false;
+    this._camYaw = Math.PI / 2 - ship.angle;
+    this.updateThirdPersonCamera(ship, true);
+  }
 
-    this.camera.fov = 54;
-    this.camera.aspect = w / h;
+  /** 角色喺 3D 場景嘅朝向（模型正面係 +Z） */
+  shipYaw(angle) {
+    return Math.PI / 2 - angle;
+  }
+
+  thirdPersonDistance() {
+    return Math.max(this.w, this.h) * 0.34;
+  }
+
+  /** 單人模式：鏡頭固定喺角色背面 */
+  updateThirdPersonCamera(ship, instant = false) {
+    const wx = ship.pos.x - this.worldW / 2;
+    const wz = ship.pos.y - this.worldH / 2;
+    const targetYaw = this.shipYaw(ship.angle);
+
+    if (instant || !this.soloCameraReady) {
+      this._camYaw = targetYaw;
+    } else {
+      let diff = targetYaw - this._camYaw;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      this._camYaw += diff * (this.mobile ? 0.12 : 0.09);
+    }
+
+    this.cameraRig.position.set(wx, 0, wz);
+    this.cameraRig.rotation.set(0, this._camYaw, 0);
+    this.cameraRig.updateMatrixWorld(true);
+
+    const dist = this.thirdPersonDistance();
+    const height = dist * 0.48;
+    const back = dist * 0.88;
+
+    // 模型正面係 +Z；鏡頭放 -Z（背面），望向前方 +Z（槍口方向）
+    this._targetCamPos.set(0, height, -back).applyMatrix4(this.cameraRig.matrixWorld);
+    this._targetLookPos.set(0, 9, 20).applyMatrix4(this.cameraRig.matrixWorld);
+
+    const alpha = instant || !this.soloCameraReady ? 1 : (this.mobile ? 0.2 : 0.16);
+    this._smoothCamPos.lerp(this._targetCamPos, alpha);
+    this._smoothLookPos.lerp(this._targetLookPos, alpha);
+
+    this.camera.position.copy(this._smoothCamPos);
+    this.camera.lookAt(this._smoothLookPos);
+    this.soloCameraReady = true;
+  }
+
+  /** 雙人 / 線上：俯視跟隨 */
+  updateTopDownCamera(focusGX, focusGY) {
+    const vw = this.w;
+    const vh = this.h;
+    const maxDim = Math.max(vw, vh);
+    const minDim = Math.min(vw, vh);
+
+    const marginX = vw * 0.42;
+    const marginY = vh * 0.42;
+    this.camFocusX += (Math.max(marginX, Math.min(this.worldW - marginX, focusGX)) - this.camFocusX) * 0.14;
+    this.camFocusY += (Math.max(marginY, Math.min(this.worldH - marginY, focusGY)) - this.camFocusY) * 0.14;
+
+    const fx = this.camFocusX - this.worldW / 2;
+    const fz = this.camFocusY - this.worldH / 2;
+    const dist = maxDim * 0.54 + minDim * 0.11;
+
+    this.camera.position.set(fx, dist * 0.94, fz + dist * 0.28);
+    this.camera.lookAt(fx, 0, fz);
+  }
+
+  /** 鏡頭喺地面嘅朝向（弧度）— 只用於顯示，唔再控制移動 */
+  getCameraForwardAngle(fallbackAngle = -Math.PI / 2) {
+    if (!this._smoothLookPos || !this._smoothCamPos || !this.soloCameraReady) {
+      return fallbackAngle;
+    }
+    const dx = this._smoothLookPos.x - this._smoothCamPos.x;
+    const dz = this._smoothLookPos.z - this._smoothCamPos.z;
+    if (Math.hypot(dx, dz) < 0.001) return fallbackAngle;
+    return Math.atan2(dz, dx);
+  }
+
+  updateCamera(game) {
+    this.camera.aspect = this.w / this.h;
     this.camera.updateProjectionMatrix();
 
-    // Pull back enough to see the whole arena; slightly closer now characters are bigger.
-    const dist = maxDim * 0.54 + minDim * 0.11;
-    this.camera.position.set(0, dist * 0.94, dist * 0.28);
-    this.camera.lookAt(0, 0, 0);
+    const solo = game.playMode === 'solo' && game.state === 'playing';
+    if (solo && game.ship && !game.ship.eliminated) {
+      this.camera.fov = 62;
+      this.updateThirdPersonCamera(game.ship, !this.soloCameraReady);
+      return;
+    }
+
+    this.soloCameraReady = false;
+    this.camera.fov = 54;
+    const focus = game.getCameraFocus?.() || { x: game.worldW / 2, y: game.worldH / 2 };
+    this.updateTopDownCamera(focus.x, focus.y);
   }
 
   setVisible(visible) {
@@ -431,11 +528,11 @@ export class Renderer3D {
   }
 
   toWorld(x, y) {
-    return { x: x - this.w / 2, z: y - this.h / 2 };
+    return { x: x - this.worldW / 2, z: y - this.worldH / 2 };
   }
 
   projectToScreen(gameX, gameY, heightY = 0) {
-    this._projVec.set(gameX - this.w / 2, heightY, gameY - this.h / 2);
+    this._projVec.set(gameX - this.worldW / 2, heightY, gameY - this.worldH / 2);
     this._projVec.project(this.camera);
     return {
       x: (this._projVec.x * 0.5 + 0.5) * this.w,
@@ -482,7 +579,7 @@ export class Renderer3D {
     mesh.visible = true;
     const p = this.toWorld(ship.pos.x, ship.pos.y);
     mesh.position.set(p.x, 0, p.z);
-    mesh.rotation.y = -ship.angle;
+    mesh.rotation.y = this.shipYaw(ship.angle);
     const bob = Math.sin(this.t * 0.12 + ship.playerIndex) * 0.6;
     mesh.position.y = bob;
     if (ship.moving) {
@@ -727,9 +824,9 @@ export class Renderer3D {
     for (let i = 0; i < arcs.length; i++) {
       const arc = arcs[i];
       const points = [
-        new THREE.Vector3(arc.x1 - this.w / 2, 8, arc.y1 - this.h / 2),
-        new THREE.Vector3(arc.mx - this.w / 2, 12, arc.my - this.h / 2),
-        new THREE.Vector3(arc.x2 - this.w / 2, 8, arc.y2 - this.h / 2),
+        new THREE.Vector3(arc.x1 - this.worldW / 2, 8, arc.y1 - this.worldH / 2),
+        new THREE.Vector3(arc.mx - this.worldW / 2, 12, arc.my - this.worldH / 2),
+        new THREE.Vector3(arc.x2 - this.worldW / 2, 8, arc.y2 - this.worldH / 2),
       ];
       let line = this.lightningLines[i];
       if (!line) {
@@ -772,7 +869,9 @@ export class Renderer3D {
 
   sync(game) {
     this.t++;
-    if (game.w !== this.w || game.h !== this.h) this.resize(game.w, game.h);
+    const sizeChanged = game.w !== this.w || game.h !== this.h
+      || game.worldW !== this.worldW || game.worldH !== this.worldH;
+    if (sizeChanged) this.resize(game.w, game.h, game.worldW, game.worldH);
 
     this.syncShip(game.ship);
     if (game.ship2) this.syncShip(game.ship2);
@@ -782,6 +881,8 @@ export class Renderer3D {
     this.syncParticles(game.particles);
     this.syncLightning(game.lightningArcs || []);
     this.syncDragonflyWave(game.dragonflyWave);
+
+    this.updateCamera(game);
 
     this.renderer.render(this.scene, this.camera);
   }
