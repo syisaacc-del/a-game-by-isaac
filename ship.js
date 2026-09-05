@@ -147,6 +147,37 @@ export class Ship {
     }
   }
 
+  /** 單人第三人稱：W/S 前後、A/D 平移；鏡頭唔受按鍵控制 */
+  moveThirdPerson(ix, iy) {
+    if (ix === 0 && iy === 0) {
+      this.vel.set(0, 0);
+      this.moving = false;
+      return;
+    }
+
+    const a = this.angle;
+    const fwdX = Math.cos(a);
+    const fwdY = Math.sin(a);
+    const rightX = -Math.sin(a);
+    const rightY = Math.cos(a);
+
+    const wx = ix * rightX + (-iy) * fwdX;
+    const wy = ix * rightY + (-iy) * fwdY;
+    const len = Math.hypot(wx, wy);
+    this.vel.set((wx / len) * this.speed, (wy / len) * this.speed);
+    this.moving = true;
+
+    // 向前行先慢慢轉身；後退 / 左右平移唔轉身
+    if (iy < 0) {
+      const target = Math.atan2(wy, wx);
+      let diff = target - this.angle;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      this.angle += diff * 0.28;
+      if (Math.abs(diff) < 0.03) this.angle = target;
+    }
+  }
+
   heal(amount) {
     this.hp = Math.min(this.maxHp, this.hp + amount);
   }
@@ -173,7 +204,7 @@ export class Ship {
     cooldown *= this.shootCdMul;
     this.shootCooldown = Math.max(3, cooldown | 0);
 
-    const muzzle = 18;
+    const muzzle = 22;
     const speed = this.hasBuff('lightning') ? 12 : 10;
     const angles = this.hasBuff('spread') ? [-0.35, -0.15, 0, 0.15, 0.35] : [0];
     const perpOffsets = this.hasBuff('dual') ? [-10, 0, 10] : [0];
