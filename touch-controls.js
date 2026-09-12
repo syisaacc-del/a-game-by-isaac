@@ -10,9 +10,9 @@ export class TouchControls {
     this.baseY = 0;
     this.stickX = 0;
     this.stickY = 0;
-    this.maxRadius = 56;
-    this.deadzone = 0.18;
-    this.sensitivity = 0.52;
+    this.maxRadius = 62;
+    this.deadzone = 0.14;
+    this.sensitivity = 0.62;
     this.dragonflyVisible = false;
     this.dragonflyCd = 0;
 
