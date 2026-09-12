@@ -158,7 +158,6 @@ class Game {
         if (e.code === 'Digit2') this.selectCharacter('viktor');
         if (e.code === 'Digit3') this.selectCharacter('zara');
         if (e.code === 'Enter') this.beginSolo();
-        if (e.code === 'KeyL') this.beginLocal();
       }
 
       if (this.state === 'onlineLobby') {
@@ -183,7 +182,6 @@ class Game {
       btn.addEventListener('click', () => this.selectCharacter(btn.dataset.char));
     });
     document.getElementById('btn-solo')?.addEventListener('click', () => this.beginSolo());
-    document.getElementById('btn-local')?.addEventListener('click', () => this.beginLocal());
     document.getElementById('btn-online-host')?.addEventListener('click', () => this.beginOnlineHost());
     document.getElementById('btn-online-join')?.addEventListener('click', () => this.beginOnlineJoin());
     this.btnMpReadyEl?.addEventListener('click', () => this.setLobbyReady(true));
@@ -211,7 +209,6 @@ class Game {
       btn.addEventListener('click', () => this.selectCharacter(btn.dataset.char));
     });
     document.getElementById('btn-solo')?.addEventListener('click', () => this.beginSolo());
-    document.getElementById('btn-local')?.addEventListener('click', () => this.beginLocal());
     document.getElementById('btn-online-host')?.addEventListener('click', () => this.beginOnlineHost());
     document.getElementById('btn-online-join')?.addEventListener('click', () => this.beginOnlineJoin());
     this.btnMpReadyEl?.addEventListener('click', () => this.setLobbyReady(true));
@@ -325,10 +322,7 @@ class Game {
 
     this.playerName = resolvePlayerName(this.p1NameInput?.value, 1);
     if (this.p1NameInput) this.p1NameInput.value = this.playerName;
-    if (this.playMode === 'local') {
-      this.player2Name = resolvePlayerName(this.p2NameInput?.value, 2);
-      if (this.p2NameInput) this.p2NameInput.value = this.player2Name;
-    } else if (this.playMode === 'online' && this.multiplayer.isHost) {
+    if (this.playMode === 'online' && this.multiplayer.isHost) {
       this.player2Name = this.multiplayer.remotePlayerName || randomPlayerName();
     } else {
       this.player2Name = '';
@@ -459,7 +453,7 @@ class Game {
     this.ship.playerIndex = 0;
     this.ship.displayName = this.playerName;
 
-    if (this.playMode === 'local' || this.playMode === 'online') {
+    if (this.playMode === 'online') {
       if (!this.ship2) this.ship2 = new Ship();
       const p2Id = this.playMode === 'online' && !this.multiplayer.isHost
         ? this.selectedCharId
@@ -486,17 +480,6 @@ class Game {
     this.multiplayer.setMode('solo');
     this.setP2NameVisible(false);
     this.resolveNames();
-    this.hideCharSelect();
-    this.startGame();
-  }
-
-  beginLocal() {
-    this.playMode = 'local';
-    this.multiplayer.setMode('local');
-    this.setP2NameVisible(true);
-    this.resolveNames();
-    const ids = CHARACTERS.map((c) => c.id).filter((id) => id !== this.selectedCharId);
-    this.selectedChar2Id = ids[Math.floor(Math.random() * ids.length)] || 'viktor';
     this.hideCharSelect();
     this.startGame();
   }
@@ -1057,19 +1040,17 @@ class Game {
       return;
     }
 
-    const p1Keys = this.playMode === 'local'
-      ? { left: ['KeyA'], right: ['KeyD'], up: ['KeyW'], down: ['KeyS'], shoot: ['Space', 'KeyK'] }
-      : { left: ['ArrowLeft', 'KeyA'], right: ['ArrowRight', 'KeyD'], up: ['ArrowUp', 'KeyW'], down: ['ArrowDown', 'KeyS'], shoot: ['Space', 'KeyK'] };
+    const p1Keys = {
+      left: ['ArrowLeft', 'KeyA'],
+      right: ['ArrowRight', 'KeyD'],
+      up: ['ArrowUp', 'KeyW'],
+      down: ['ArrowDown', 'KeyS'],
+      shoot: ['Space', 'KeyK'],
+    };
 
     this.inputShip(this.ship, this.mobile && this.touch ? this.touch.getInput() : null, p1Keys);
 
-    if (this.ship2 && this.playMode === 'local') {
-      this.inputShip(this.ship2, null, {
-        left: ['ArrowLeft'], right: ['ArrowRight'],
-        up: ['ArrowUp'], down: ['ArrowDown'],
-        shoot: ['Enter', 'NumpadEnter'],
-      });
-    } else if (this.ship2 && this.playMode === 'online' && this.multiplayer.isHost) {
+    if (this.ship2 && this.playMode === 'online' && this.multiplayer.isHost) {
       this.inputShip(this.ship2, this.multiplayer.remoteInput, {
         left: [], right: [], up: [], down: [], shoot: [],
       });
