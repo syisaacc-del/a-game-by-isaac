@@ -72,6 +72,23 @@ html[data-mobile="true"] .modal-btns {
   margin-top: 20px;
 }
 
+.mobile-controls-tip {
+  display: none;
+}
+
+html[data-mobile="true"] .mobile-controls-tip {
+  display: block;
+  margin: 8px 0 2px;
+  text-align: center;
+  color: #9ab;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+html[data-mobile="true"] .mode-btns .mob-btn-y:only-child {
+  flex: 1 1 100%;
+}
+
 html[data-mobile="true"] .mob-btn {
   flex: 1;
   font-family: "Lucida Sans Typewriter", "Lucida Console", Monaco, monospace;
